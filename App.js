@@ -8,15 +8,6 @@ import {
   Alert,
   ScrollView,
   Modal,
-  import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-  Modal,
   Linking,
 } from 'react-native';
 
