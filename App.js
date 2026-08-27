@@ -8,7 +8,19 @@ import {
   Alert,
   ScrollView,
   Modal,
+  import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+  Modal,
+  Linking,
 } from 'react-native';
+
+
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
 
@@ -61,10 +73,7 @@ const openProfile = async (targetUserId) => {
 
 
   const donate = () => {
-  Alert.alert(
-    '💛 Помощь проекту',
-    'Спасибо, что хотите поддержать «Рядом»! Переведите любую сумму на Kaspi:\n\n+7 778 327 9491',
-  );
+  Linking.openURL('https://pay.kaspi.kz/pay/y0lpmrri');
 };
 
   const getUserLocation = async () => {
