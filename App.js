@@ -14,6 +14,7 @@ import {
 
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = 'https://ryadom-backend-production.up.railway.app';
 
@@ -45,6 +46,21 @@ const [reviewComment, setReviewComment] = useState('');
 const [profileVisible, setProfileVisible] = useState(false);
 const [profileData, setProfileData] = useState(null);
 const [profileReviews, setProfileReviews] = useState([]);
+  useEffect(() => {
+    const loadSavedUser = async () => {
+      const savedId = await AsyncStorage.getItem('userId');
+      const savedName = await AsyncStorage.getItem('userName');
+      if (savedId) {
+        setUserId(savedId);
+        setUserName(savedName || 'Пользователь');
+        setStep('role');
+      }
+    };
+    loadSavedUser();
+  }, []);
+
+
+
 
 const openProfile = async (targetUserId) => {
   try {
@@ -127,8 +143,10 @@ const openProfile = async (targetUserId) => {
       const data = await res.json();
       if (data.success) {
         setUserId(data.user.id);
-        setUserName(data.user.name);
-        setStep('role');
+      setUserName(data.user.name);
+      await AsyncStorage.setItem('userId', String(data.user.id));
+      await AsyncStorage.setItem('userName', data.user.name);
+      setStep('role');
       } else {
         Alert.alert('Ошибка', data.error || 'Неверный код');
       }
