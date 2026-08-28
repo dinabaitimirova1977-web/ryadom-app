@@ -252,11 +252,14 @@ const openProfile = async (targetUserId) => {
     setLoading(false);
   };
 const completeRequest = async (requestId) => {
-  setLoading(true);
-  try {
-    const res = await fetch(`${API_URL}/api/requests/${requestId}/complete`, {
+    setLoading(true);
+    try {
+  const res = await fetch(`${API_URL}/api/requests/${requestId}/complete`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
     });
+
     const data = await res.json();
     if (data.success) {
       setReviewRequestId(requestId);
