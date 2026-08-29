@@ -27,6 +27,7 @@ export default function App() {
   const [userName, setUserName] = useState('');
 
   const [category, setCategory] = useState('food');
+  const [requestType, setRequestType] = useState('need');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
@@ -158,6 +159,7 @@ const openProfile = async (targetUserId) => {
 
   const selectRole = (selectedRole) => {
     if (selectedRole === 'needer') {
+      setRequestType('need');
       setStep('createRequest');
     } else {
       loadRequests();
@@ -182,6 +184,7 @@ const openProfile = async (targetUserId) => {
           description,
           lat: userLat,
           lng: userLng,
+          type: requestType,
         }),
       });
       const data = await res.json();
@@ -252,14 +255,13 @@ const openProfile = async (targetUserId) => {
     setLoading(false);
   };
 const completeRequest = async (requestId) => {
-    setLoading(true);
-    try {
-  const res = await fetch(`${API_URL}/api/requests/${requestId}/complete`, {
-      method: 'POST',
+  setLoading(true);
+  try {
+    const res = await fetch(`${API_URL}/api/requests/${requestId}/complete`, {
+     method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId }),
     });
-
     const data = await res.json();
     if (data.success) {
       setReviewRequestId(requestId);
@@ -404,6 +406,11 @@ const submitReview = async () => {
               <Text style={styles.categoryButtonText}>👕 Одежда</Text>
             </TouchableOpacity>
           </View>
+{category === 'food' && (
+  <Text style={styles.expiryHint}>
+    ⏱ Объявления о еде автоматически скрываются через 24 часа
+  </Text>
+)}
 
           <TextInput
             style={styles.input}
@@ -604,9 +611,18 @@ const submitReview = async () => {
     <Text style={[styles.viewModeText, browseViewMode === 'map' && styles.viewModeTextActive]}>🗺️ Карта</Text>
   </TouchableOpacity>
 </View>
-
-
-
+<TouchableOpacity
+  style={styles.donateButton}
+  onPress={() => {
+    setRequestType('offer');
+    setCategory('food');
+    setTitle('');
+    setDescription('');
+    setStep('createRequest');
+  }}
+>
+  <Text style={styles.roleButtonText}>🎁 Что я готов отдать сейчас</Text>
+</TouchableOpacity>
 
           {loading && <Text>Загрузка...</Text>}
           {browseViewMode === 'list' && (
@@ -709,17 +725,19 @@ const submitReview = async () => {
 }
 
 const styles = StyleSheet.create({
+  expiryHint: {
+    fontSize: 13,
+    color: '#888',
+    marginBottom: 10,
+    fontStyle: 'italic',
+  },
+
   donateButton: {
   marginTop: 24,
   padding: 12,
   alignItems: 'center',
 },
- donateButton: {
-    marginTop: 24,
-    padding: 12,
-    alignItems: 'center',
-  },
-  viewModeButton: {
+   viewModeButton: {
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,
