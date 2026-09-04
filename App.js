@@ -81,8 +81,8 @@ const openProfile = async (targetUserId) => {
 
 
   const donate = () => {
-  Linking.openURL('https://pay.kaspi.kz/pay/y0lpmrri');
-};
+  Linking.openURL('https://dinabaitimirova1977-web.github.io/ryadom-app/support.html');
+
 
   const getUserLocation = async () => {
     try {
