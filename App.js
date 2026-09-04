@@ -82,7 +82,7 @@ const openProfile = async (targetUserId) => {
 
   const donate = () => {
   Linking.openURL('https://dinabaitimirova1977-web.github.io/ryadom-app/support.html');
-  },
+  }:
 const deleteAccount = () => {
   Alert.alert(
     'Удалить аккаунт',
