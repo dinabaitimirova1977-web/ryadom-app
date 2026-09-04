@@ -82,6 +82,34 @@ const openProfile = async (targetUserId) => {
 
   const donate = () => {
   Linking.openURL('https://dinabaitimirova1977-web.github.io/ryadom-app/support.html');
+const deleteAccount = () => {
+  Alert.alert(
+    'Удалить аккаунт',
+    'Это действие необратимо. Все ваши данные будут удалены.',
+    [
+      { text: 'Отмена', style: 'cancel' },
+      {
+        text: 'Удалить',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const res = await fetch(`${API_URL}/api/users/${userId}`, { method: 'DELETE' });
+            if (res.ok) {
+              await AsyncStorage.clear();
+              setUserId(null);
+              setStep('phone');
+              Alert.alert('Готово', 'Аккаунт удалён');
+            } else {
+              Alert.alert('Ошибка', 'Не удалось удалить аккаунт');
+            }
+          } catch (e) {
+            Alert.alert('Ошибка сети', e.message);
+          }
+        },
+      },
+    ]
+  );
+};
 
 
   const getUserLocation = async () => {
@@ -92,7 +120,7 @@ const openProfile = async (targetUserId) => {
           'Геолокация',
           'Без доступа к геолокации будут показаны примерные координаты (Атырау)'
         );
-        return;
+        return;e.
       }
       const loc = await Location.getCurrentPositionAsync({});
       setUserLat(loc.coords.latitude);
@@ -453,6 +481,12 @@ const submitReview = async () => {
             onPress={() => setStep('role')}>
             <Text style={styles.backButtonText}>← Назад</Text>
           </TouchableOpacity>
+              <TouchableOpacity
+            style={{ marginTop: 20, padding: 12, alignItems: 'center' }}
+            onPress={deleteAccount}
+          >
+            <Text style={{ color: '#cc3333', fontSize: 14 }}>Удалить аккаунт</Text>
+          </TouchableOpacity> 
         </ScrollView>
       )}
       <Modal visible={mapVisible} animationType="slide"><View style={{flex:1}}><WebView style={{flex:1}} source={{html:`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /><style>#map{height:100vh;width:100vw;margin:0;padding:0;}</style></head><body style="margin:0;padding:0;"><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>var map=L.map('map').setView([${userLat},${userLng}],14);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);var marker=L.marker([${userLat},${userLng}],{draggable:true}).addTo(map);function sendCoords(lat,lng){window.ReactNativeWebView.postMessage(JSON.stringify({lat:lat,lng:lng}));}marker.on('dragend',function(e){var pos=marker.getLatLng();sendCoords(pos.lat,pos.lng);});map.on('click',function(e){marker.setLatLng(e.latlng);sendCoords(e.latlng.lat,e.latlng.lng);});</script></body></html>`}} onMessage={(event)=>{const data=JSON.parse(event.nativeEvent.data);setUserLat(data.lat);setUserLng(data.lng);}} /><TouchableOpacity style={[styles.button,{margin:16}]} onPress={()=>setMapVisible(false)}><Text style={styles.buttonText}>Готово</Text></TouchableOpacity></View></Modal>
