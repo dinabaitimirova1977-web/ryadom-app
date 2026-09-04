@@ -82,6 +82,7 @@ const openProfile = async (targetUserId) => {
 
   const donate = () => {
   Linking.openURL('https://dinabaitimirova1977-web.github.io/ryadom-app/support.html');
+  },
 const deleteAccount = () => {
   Alert.alert(
     'Удалить аккаунт',
@@ -732,8 +733,7 @@ const submitReview = async () => {
     onPress={() => setMapCategoryFilter('clothes')}>
     <Text style={[styles.viewModeText, mapCategoryFilter === 'clothes' && styles.viewModeTextActive]}>👕 Одежда</Text>
   </TouchableOpacity>
-</View>
-  )}          
+</View>         
   <View style={{ height: 400, width: '100%', marginBottom: 16 }}>
     <WebView
       style={{ flex: 1 }}
