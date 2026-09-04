@@ -120,7 +120,7 @@ const deleteAccount = () => {
           'Геолокация',
           'Без доступа к геолокации будут показаны примерные координаты (Атырау)'
         );
-        return;e.
+        return;
       }
       const loc = await Location.getCurrentPositionAsync({});
       setUserLat(loc.coords.latitude);
