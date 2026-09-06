@@ -83,6 +83,12 @@ const openProfile = async (targetUserId) => {
   const donate = () => {
   Linking.openURL('https://dinabaitimirova1977-web.github.io/ryadom-app/support.html');
   };
+  const logout = async () => {
+  await AsyncStorage.removeItem('userId');
+  await AsyncStorage.removeItem('userName');
+  setUserId(null);
+  setStep('phone');
+};
 const deleteAccount = () => {
   Alert.alert(
     'Удалить аккаунт',
@@ -482,6 +488,14 @@ const submitReview = async () => {
             onPress={() => setStep('role')}>
             <Text style={styles.backButtonText}>← Назад</Text>
           </TouchableOpacity>
+              <TouchableOpacity
+  style={{ marginTop: 20, padding: 12, alignItems: 'center' }}
+  onPress={logout}
+>
+  <Text style={{ color: '#388E3C', fontSize: 14 }}>Выйти</Text>
+</TouchableOpacity>
+
+
               <TouchableOpacity
             style={{ marginTop: 20, padding: 12, alignItems: 'center' }}
             onPress={deleteAccount}
