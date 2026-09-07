@@ -709,6 +709,7 @@ const submitReview = async () => {
 
 
       ) : (
+        <>
         <TouchableOpacity
           style={styles.helpButton}
           onPress={() => respondToRequest(r.id)}
@@ -748,6 +749,7 @@ const submitReview = async () => {
   >
     <Text style={{ color: '#999', fontSize: 12 }}>⚠️ Пожаловаться</Text>
   </TouchableOpacity>
+  </>
  
       )}
     </View>
