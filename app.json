@@ -16,8 +16,7 @@
   "supportsTablet": true,
   "bundleIdentifier": "com.dinabai77.ryadom",
   "infoPlist": {
-    "NSUserTrackingUsageDescription": "Мы используем эти данные, чтобы показывать вам ближайшие к вам запросы о помощи и предложения от соседей поблизости."
-  }
+     }
 },
     "android": {
       "adaptiveIcon": {
