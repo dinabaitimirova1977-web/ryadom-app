@@ -33,6 +33,7 @@ export default function App() {
   const [description, setDescription] = useState('');
 
   const [requests, setRequests] = useState([]);
+  const [offers, setOffers] = useState([]);
   const [respondedIds, setRespondedIds] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
   const [userLat, setUserLat] = useState(47.1164);
@@ -194,11 +195,10 @@ const deleteAccount = () => {
   };
 
   const selectRole = (selectedRole) => {
-    if (selectedRole === 'needer') {
-      setRequestType('need');
-      setStep('createRequest');
+   if (selectedRole === 'needer') {
+      setStep('neederChoice');
     } else {
-      loadRequests();
+          loadRequests();
       setStep('browseRequests');
     }
   };
@@ -247,6 +247,19 @@ const deleteAccount = () => {
 
       const data = await res.json();
       setRequests(data.requests || []);
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+    setLoading(false);
+  };
+  const loadOffers = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${API_URL}/api/requests?lat=${userLat}&lng=${userLng}&type=offer`
+      );
+      const data = await res.json();
+      setOffers(data.requests || []);
     } catch (e) {
       Alert.alert('Ошибка сети', e.message);
     }
@@ -419,6 +432,39 @@ const submitReview = async () => {
 </TouchableOpacity>
         </>
       )}
+
+      {step === 'neederChoice' && (
+          <>
+            <Text style={styles.question}>Что вы хотите сделать?</Text>
+
+            <TouchableOpacity
+              style={styles.roleButton}
+              onPress={() => {
+                setRequestType('need');
+                setStep('createRequest');
+              }}>
+              <Text style={styles.roleButtonText}>🙋 Мне нужна помощь</Text>
+              <Text style={styles.roleButtonSubtext}>Создать запрос о помощи</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.roleButton}
+              onPress={() => {
+                loadOffers();
+                setStep('browseOffers');
+              }}>
+              <Text style={styles.roleButtonText}>🎁 Посмотреть, что предлагают</Text>
+              <Text style={styles.roleButtonSubtext}>Взять то, что отдают соседи</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => setStep('role')}>
+              <Text style={styles.backButtonText}>← Назад</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
 
       {step === 'createRequest' && (
         <ScrollView style={{ width: '100%' }}>
@@ -625,6 +671,18 @@ const submitReview = async () => {
 
             </View>
           ))}
+          <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={logout}>
+          <Text style={styles.logoutButtonText}>Выйти</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={deleteAccount}>
+          <Text style={styles.deleteButtonText}>Удалить аккаунт</Text>
+        </TouchableOpacity>
+
 
           <TouchableOpacity
             style={styles.backButton}
@@ -787,14 +845,66 @@ const submitReview = async () => {
   </>
 )}
 
+<TouchableOpacity
+          style={styles.logoutButton}
+          onPress={logout}>
+          <Text style={styles.logoutButtonText}>Выйти</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={deleteAccount}>
+          <Text style={styles.deleteButtonText}>Удалить аккаунт</Text>
+        </TouchableOpacity>
+
+
+
+
 
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => setStep('role')}>
             <Text style={styles.backButtonText}>← Назад</Text>
           </TouchableOpacity>
-        </ScrollView>
+                  </ScrollView>
       )}
+    {step === 'browseOffers' && (
+      <ScrollView style={{ width: '100%' }}>
+      <Text style={styles.question}>Что предлагают рядом</Text>
+      {loading && <Text>Загрузка...</Text>}
+      {!loading && offers.length === 0 && (
+        <Text style={styles.emptyText}>Пока никто ничего не предлагает</Text>
+        )}
+
+        {offers.map((o) => (
+          <View key={o.id} style={styles.requestCard}>
+            <Text style={styles.requestTitle}>
+              {o.category === 'food' ? '🍲' : '👕'} {o.title}
+            </Text>
+            {o.description ? (
+              <Text style={styles.requestDesc}>{o.description}</Text>
+            ) : null}
+            <Text onPress={() => openProfile(o.user_id)} style={{ textDecorationLine: 'underline' }}>
+              {o.user_name}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.helpButton}
+              onPress={() => respondToRequest(o.id)}
+              disabled={loading}>
+              <Text style={styles.helpButtonText}>Взять</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => setStep('neederChoice')}>
+          <Text style={styles.backButtonText}>← Назад</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    )}
+
     </View>
   );
 }
@@ -991,6 +1101,33 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
+  logoutButton: {
+    marginTop: 24,
+    backgroundColor: '#999',
+    borderRadius: 6,
+    padding: 12,
+    alignItems: 'center',
+  },
+  logoutButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  deleteButton: {
+    marginTop: 10,
+    backgroundColor: '#D32F2F',
+    borderRadius: 6,
+    padding: 12,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+
+
   respondedText: {
     marginTop: 10,
     color: '#2E7D32',
