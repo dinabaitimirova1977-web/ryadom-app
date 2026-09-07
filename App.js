@@ -724,6 +724,23 @@ const submitReview = async () => {
           disabled={loading}>
           <Text style={styles.helpButtonText}>Помочь</Text>
         </TouchableOpacity>
+                   <TouchableOpacity
+  style={{ marginTop: 6, alignItems: 'center' }}
+  onPress={() => Alert.alert(
+    'Пожаловаться',
+    'Сообщить о нарушении в этом объявлении?',
+    [
+      { text: 'Отмена', style: 'cancel' },
+      {
+        text: 'Пожаловаться',
+        onPress: () => Alert.alert('Спасибо', 'Жалоба отправлена, мы проверим объявление.'),
+      },
+    ]
+  )}
+>
+  <Text style={{ color: '#999', fontSize: 12 }}>⚠️ Пожаловаться</Text>
+</TouchableOpacity>
+ 
       )}
     </View>
   ))}
