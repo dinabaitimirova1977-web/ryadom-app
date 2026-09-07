@@ -9,7 +9,8 @@ import {
   ScrollView,
   Modal,
   Linking,
-} from 'react-native';
+    Platform,
+} from "react-native";
 
 
 import * as Location from 'expo-location';
@@ -488,33 +489,7 @@ const submitReview = async () => {
             onPress={() => setStep('role')}>
             <Text style={styles.backButtonText}>← Назад</Text>
           </TouchableOpacity>
-              <TouchableOpacity
-  style={{ marginTop: 20, padding: 12, alignItems: 'center' }}
-  onPress={logout}
->
-  <Text style={{ color: '#388E3C', fontSize: 14 }}>Выйти</Text>
-</TouchableOpacity>
-
-
-              <TouchableOpacity
-            style={{ marginTop: 20, padding: 12, alignItems: 'center' }}
-            onPress={deleteAccount}
-          >
-            <Text style={{ color: '#cc3333', fontSize: 14 }}>Удалить аккаунт</Text>
-          </TouchableOpacity> 
-       <TouchableOpacity
-  style={{ marginTop: 20, padding: 12, alignItems: 'center' }}
-  onPress={logout}
->
-  <Text style={{ color: '#388E3C', fontSize: 14 }}>Выйти</Text>
-</TouchableOpacity>
-
-<TouchableOpacity
-  style={{ marginTop: 4, padding: 12, alignItems: 'center' }}
-  onPress={deleteAccount}
->
-  <Text style={{ color: '#cc3333', fontSize: 14 }}>Удалить аккаунт</Text>
-</TouchableOpacity>
+              
 
 
 
@@ -741,21 +716,38 @@ const submitReview = async () => {
           <Text style={styles.helpButtonText}>Помочь</Text>
         </TouchableOpacity>
                    <TouchableOpacity
-  style={{ marginTop: 6, alignItems: 'center' }}
-  onPress={() => Alert.alert(
-    'Пожаловаться',
-    'Сообщить о нарушении в этом объявлении?',
-    [
-      { text: 'Отмена', style: 'cancel' },
-      {
-        text: 'Пожаловаться',
-        onPress: () => Alert.alert('Спасибо', 'Жалоба отправлена, мы проверим объявление.'),
-      },
-    ]
-  )}
->
-  <Text style={{ color: '#999', fontSize: 12 }}>⚠️ Пожаловаться</Text>
-</TouchableOpacity>
+    style={{ marginTop: 6, alignItems: 'center' }}
+    onPress={() => {
+      if (Platform.OS === 'ios') {
+        Alert.prompt(
+          'Пожаловаться',
+          'Опишите, в чём нарушение (необязательно)',
+          [
+            { text: 'Отмена', style: 'cancel' },
+            {
+              text: 'Отправить',
+              onPress: () => Alert.alert('Спасибо', 'Жалоба отправлена, мы проверим объявление.'),
+            },
+          ],
+          'plain-text'
+        );
+      } else {
+        Alert.alert(
+          'Пожаловаться',
+          'Сообщить о нарушении в этом объявлении?',
+          [
+            { text: 'Отмена', style: 'cancel' },
+            {
+              text: 'Пожаловаться',
+              onPress: () => Alert.alert('Спасибо', 'Жалоба отправлена, мы проверим объявление.'),
+            },
+          ]
+        );
+      }
+    }}
+  >
+    <Text style={{ color: '#999', fontSize: 12 }}>⚠️ Пожаловаться</Text>
+  </TouchableOpacity>
  
       )}
     </View>
