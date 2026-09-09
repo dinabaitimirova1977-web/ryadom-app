@@ -112,7 +112,7 @@ const deleteAccount = () => {
               Alert.alert('Ошибка', 'Не удалось удалить аккаунт');
             }
           } catch (e) {
-            Alert.alert('Ошибка сети', e.message);
+            Alert.alert('Ошибка сети',e.message);
           }
         },
       },
@@ -139,9 +139,7 @@ const deleteAccount = () => {
     }
   };
 
-  useEffect(() => {
-    getUserLocation();
-  }, []);
+  
   const sendOtp = async () => {
     if (!phone) {
       Alert.alert('Ошибка', 'Введите номер телефона');
@@ -451,6 +449,7 @@ const submitReview = async () => {
               style={styles.roleButton}
               onPress={() => {
                 loadOffers();
+                getUserLocation();
                 setStep('browseOffers');
               }}>
               <Text style={styles.roleButtonText}>🎁 Посмотреть, что предлагают</Text>
