@@ -7,18 +7,21 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "scheme": "ryadom",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-   "ios": {
-  "supportsTablet": true,
-  "bundleIdentifier": "com.dinabai77.ryadom",
-  "infoPlist": {
-     }
-},
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dinabai77.ryadom",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+      }
+    },
     "android": {
+      "package": "com.dinabai77.ryadom",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -27,11 +30,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    } ,
+    },
+    "plugins": [
+      "expo-apple-authentication",
+      "expo-web-browser"
+    ],
     "extra": {
-  "eas": {
-    "projectId": "e9dd0ae9-9345-44ec-b466-b58a58df9f2f"
-  }
+      "eas": {
+        "projectId": "e9dd0ae9-9345-44ec-b466-b58a58df9f2f"
+      }
     }
   }
 }
