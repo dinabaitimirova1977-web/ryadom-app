@@ -11,27 +11,30 @@ import {
   Linking,
     Platform,
 } from "react-native";
-
-
+ 
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as WebBrowser from 'expo-web-browser';
+import * as ExpoLinking from 'expo-linking';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
+WebBrowser.maybeCompleteAuthSession();
+ 
 const API_URL = 'https://ryadom-backend-production.up.railway.app';
-
+ 
 export default function App() {
-  const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
-  const [step, setStep] = useState('phone'); // phone, code, role, createRequest, browseRequests
+  const [step, setStep] = useState('phone'); // phone (экран входа), role, createRequest, browseRequests
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState(null);
   const [userName, setUserName] = useState('');
-
+  const [appleAvailable, setAppleAvailable] = useState(false);
+ 
   const [category, setCategory] = useState('food');
   const [requestType, setRequestType] = useState('need');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-
+ 
   const [requests, setRequests] = useState([]);
   const [offers, setOffers] = useState([]);
   const [respondedIds, setRespondedIds] = useState([]);
@@ -62,9 +65,100 @@ const [profileReviews, setProfileReviews] = useState([]);
     loadSavedUser();
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync()
+        .then(setAppleAvailable)
+        .catch(() => setAppleAvailable(false));
+    }
+  }, []);
 
+  // Общий шаг после входа через Google или Apple
+  const saveUser = async (user) => {
+    const name = user.name || 'Пользователь';
+    setUserId(user.id);
+    setUserName(name);
+    await AsyncStorage.setItem('userId', String(user.id));
+    await AsyncStorage.setItem('userName', name);
+    setStep('role');
+  };
 
+  const loginWithGoogle = async () => {
+    setLoading(true);
+    try {
+      const redirectUrl = 'ryadom://auth';
+      const startUrl = `${API_URL}/api/auth/google/start?redirect=${encodeURIComponent(redirectUrl)}`;
+      const result = await WebBrowser.openAuthSessionAsync(startUrl, redirectUrl);
 
+      if (result.type !== 'success' || !result.url) {
+        setLoading(false);
+        return; // пользователь закрыл окно
+      }
+
+      const { queryParams } = ExpoLinking.parse(result.url);
+      const authCode = queryParams && queryParams.code;
+      if (!authCode) {
+        Alert.alert('Ошибка', 'Google не вернул код входа. Попробуйте ещё раз.');
+        setLoading(false);
+        return;
+      }
+
+      const res = await fetch(`${API_URL}/api/auth/exchange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: authCode }),
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        await saveUser(data.user);
+      } else {
+        Alert.alert('Ошибка', data.error || 'Не удалось войти через Google');
+      }
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+    setLoading(false);
+  };
+
+  const loginWithApple = async () => {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      setLoading(true);
+      const fullName = [
+        credential.fullName?.givenName,
+        credential.fullName?.familyName,
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      const res = await fetch(`${API_URL}/api/auth/apple`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identityToken: credential.identityToken,
+          fullName,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        await saveUser(data.user);
+      } else {
+        Alert.alert('Ошибка', data.error || 'Не удалось войти через Apple');
+      }
+    } catch (e) {
+      if (e.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Ошибка', e.message);
+      }
+    }
+    setLoading(false);
+  };
+ 
+ 
 const openProfile = async (targetUserId) => {
   try {
     const resUser = await fetch(`${API_URL}/api/users/${targetUserId}`);
@@ -78,10 +172,8 @@ const openProfile = async (targetUserId) => {
     Alert.alert('Ошибка сети', e.message);
   }
 };
-
-
-
-
+ 
+ 
   const donate = () => {
   Linking.openURL('https://dinabaitimirova1977-web.github.io/ryadom-app/support.html');
   };
@@ -106,7 +198,7 @@ const deleteAccount = () => {
             if (res.ok) {
               await AsyncStorage.clear();
               setUserId(null);
-              setStep('phone');
+                        setStep('phone');
               Alert.alert('Готово', 'Аккаунт удалён');
             } else {
               Alert.alert('Ошибка', 'Не удалось удалить аккаунт');
@@ -119,8 +211,7 @@ const deleteAccount = () => {
     ]
   );
 };
-
-
+ 
   const getUserLocation = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -138,60 +229,10 @@ const deleteAccount = () => {
       console.log('Location error:', e.message);
     }
   };
-
+ 
   
-  const sendOtp = async () => {
-    if (!phone) {
-      Alert.alert('Ошибка', 'Введите номер телефона');
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/auth/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setStep('code');
-        Alert.alert(
-          'Код отправлен',
-          'Проверьте SMS (или логи Railway в тестовом режиме)'
-        );
-      } else {
-        Alert.alert('Ошибка', data.error || 'Не удалось отправить код');
-      }
-    } catch (e) {
-      Alert.alert('Ошибка сети', e.message);
-    }
-    setLoading(false);
-  };
-
-  const verifyOtp = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/auth/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, code, name: 'Пользователь' }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setUserId(data.user.id);
-      setUserName(data.user.name);
-      await AsyncStorage.setItem('userId', String(data.user.id));
-      await AsyncStorage.setItem('userName', data.user.name);
-      setStep('role');
-      } else {
-        Alert.alert('Ошибка', data.error || 'Неверный код');
-      }
-    } catch (e) {
-      Alert.alert('Ошибка сети', e.message);
-    }
-    setLoading(false);
-  };
-
+ 
+ 
   const selectRole = (selectedRole) => {
    if (selectedRole === 'needer') {
       setStep('neederChoice');
@@ -200,7 +241,7 @@ const deleteAccount = () => {
       setStep('browseRequests');
     }
   };
-
+ 
   const createRequest = async () => {
     if (!title) {
       Alert.alert('Ошибка', 'Введите заголовок запроса');
@@ -235,14 +276,14 @@ const deleteAccount = () => {
     }
     setLoading(false);
   };
-
+ 
   const loadRequests = async () => {
     setLoading(true);
     try {
       const res = await fetch(
         `${API_URL}/api/requests?lat=${userLat}&lng=${userLng}`
       );
-
+ 
       const data = await res.json();
       setRequests(data.requests || []);
     } catch (e) {
@@ -274,7 +315,7 @@ const deleteAccount = () => {
     }
     setLoading(false);
   };
-
+ 
   const respondToRequest = async (requestId) => {
     setLoading(true);
     try {
@@ -354,71 +395,52 @@ const submitReview = async () => {
   }
   setLoading(false);
 };
-
-
-
-
-
-
-
-
+ 
+ 
+ 
+ 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Рядом</Text>
       <Text style={styles.subtitle}>Помогаем соседям</Text>
-
+ 
       {step === 'phone' && (
         <>
-          <TextInput
-            style={styles.input}
-            placeholder="+7 700 000 00 00"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-          />
           <TouchableOpacity
-            style={styles.button}
-            onPress={sendOtp}
+            style={styles.googleButton}
+            onPress={loginWithGoogle}
             disabled={loading}>
-            <Text style={styles.buttonText}>
-              {loading ? 'Отправка...' : 'Получить код'}
+            <Text style={styles.googleButtonText}>
+              {loading ? 'Вход...' : 'Войти через Google'}
             </Text>
           </TouchableOpacity>
+
+          {appleAvailable && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={8}
+              style={styles.appleButton}
+              onPress={loginWithApple}
+            />
+          )}
+
         </>
       )}
-
-      {step === 'code' && (
-        <>
-          <TextInput
-            style={styles.input}
-            placeholder="Код из SMS"
-            value={code}
-            onChangeText={setCode}
-            keyboardType="number-pad"
-          />
-          <TouchableOpacity
-            style={styles.button}
-            onPress={verifyOtp}
-            disabled={loading}>
-            <Text style={styles.buttonText}>
-              {loading ? 'Проверка...' : 'Войти'}
-            </Text>
-          </TouchableOpacity>
-        </>
-      )}
-
+ 
+ 
       {step === 'role' && (
         <>
           <Text style={styles.welcome}>Добро пожаловать, {userName}!</Text>
           <Text style={styles.question}>Кто вы?</Text>
-
+ 
           <TouchableOpacity
             style={styles.roleButton}
             onPress={() => selectRole('needer')}>
             <Text style={styles.roleButtonText}>🙋 Нуждающийся</Text>
             <Text style={styles.roleButtonSubtext}>Мне нужна помощь</Text>
           </TouchableOpacity>
-
+ 
           <TouchableOpacity
             style={styles.roleButton}
             onPress={() => selectRole('helper')}>
@@ -430,11 +452,11 @@ const submitReview = async () => {
 </TouchableOpacity>
         </>
       )}
-
+ 
       {step === 'neederChoice' && (
           <>
             <Text style={styles.question}>Что вы хотите сделать?</Text>
-
+ 
             <TouchableOpacity
               style={styles.roleButton}
               onPress={() => {
@@ -444,7 +466,7 @@ const submitReview = async () => {
               <Text style={styles.roleButtonText}>🙋 Мне нужна помощь</Text>
               <Text style={styles.roleButtonSubtext}>Создать запрос о помощи</Text>
             </TouchableOpacity>
-
+ 
             <TouchableOpacity
               style={styles.roleButton}
               onPress={() => {
@@ -455,7 +477,7 @@ const submitReview = async () => {
               <Text style={styles.roleButtonText}>🎁 Посмотреть, что предлагают</Text>
               <Text style={styles.roleButtonSubtext}>Взять то, что отдают соседи</Text>
             </TouchableOpacity>
-
+ 
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => setStep('role')}>
@@ -463,12 +485,11 @@ const submitReview = async () => {
             </TouchableOpacity>
           </>
         )}
-
-
+ 
       {step === 'createRequest' && (
         <ScrollView style={{ width: '100%' }}>
           <Text style={styles.question}>Что вам нужно?</Text>
-
+ 
           <View style={styles.categoryRow}>
             <TouchableOpacity
               style={[
@@ -492,7 +513,7 @@ const submitReview = async () => {
     ⏱ Объявления о еде автоматически скрываются через 24 часа
   </Text>
 )}
-
+ 
           <TextInput
             style={styles.input}
             placeholder="Коротко, что нужно"
@@ -511,7 +532,7 @@ const submitReview = async () => {
             onPress={() => setMapVisible(true)}>
             <Text style={styles.mapButtonText}>📍 Уточнить место на карте</Text>
           </TouchableOpacity>
-
+ 
           <TouchableOpacity
             style={styles.button}
             onPress={createRequest}
@@ -528,16 +549,15 @@ const submitReview = async () => {
             }}>
             <Text style={styles.linkButtonText}>📋 Мои запросы</Text>
           </TouchableOpacity>
-
+ 
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => setStep('role')}>
             <Text style={styles.backButtonText}>← Назад</Text>
           </TouchableOpacity>
               
-
-
-
+ 
+ 
               </ScrollView>
       )}
       <Modal visible={mapVisible} animationType="slide"><View style={{flex:1}}><WebView style={{flex:1}} source={{html:`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /><style>#map{height:100vh;width:100vw;margin:0;padding:0;}</style></head><body style="margin:0;padding:0;"><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>var map=L.map('map').setView([${userLat},${userLng}],14);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);var marker=L.marker([${userLat},${userLng}],{draggable:true}).addTo(map);function sendCoords(lat,lng){window.ReactNativeWebView.postMessage(JSON.stringify({lat:lat,lng:lng}));}marker.on('dragend',function(e){var pos=marker.getLatLng();sendCoords(pos.lat,pos.lng);});map.on('click',function(e){marker.setLatLng(e.latlng);sendCoords(e.latlng.lat,e.latlng.lng);});</script></body></html>`}} onMessage={(event)=>{const data=JSON.parse(event.nativeEvent.data);setUserLat(data.lat);setUserLng(data.lng);}} /><TouchableOpacity style={[styles.button,{margin:16}]} onPress={()=>setMapVisible(false)}><Text style={styles.buttonText}>Готово</Text></TouchableOpacity></View></Modal>
@@ -608,23 +628,20 @@ const submitReview = async () => {
     </View>
   </View>
 </Modal>
-
-
-
-
-
-
-
+ 
+ 
+ 
+ 
       {step === 'myRequests' && (
         <ScrollView style={{ width: '100%' }}>
           <Text style={styles.question}>Мои запросы</Text>
-
+ 
           {loading && <Text>Загрузка...</Text>}
-
+ 
           {!loading && myRequests.length === 0 && (
             <Text style={styles.emptyText}>У вас пока нет запросов</Text>
           )}
-
+ 
           {myRequests.map((r) => (
             <View key={r.id} style={styles.requestCard}>
               <Text style={styles.requestTitle}>
@@ -633,13 +650,13 @@ const submitReview = async () => {
               {r.description ? (
                 <Text style={styles.requestDesc}>{r.description}</Text>
               ) : null}
-
+ 
               {r.responses && r.responses.length > 0 ? (
                 r.responses.map((resp) => (
                   <View key={resp.id} style={styles.responseItem}>
                     <Text style={styles.responseText}>
                       🧑 <Text onPress={() => openProfile(resp.helper_id)} style={{ textDecorationLine: 'underline' }}>{resp.helper_name}</Text> · {resp.helper_phone}
-
+ 
                     </Text>
                   </View>
                 ))
@@ -658,16 +675,14 @@ const submitReview = async () => {
   setReviewToUserId(helperId);
   completeRequest(r.id);
 }}
-
-
-
+ 
+ 
     disabled={loading}>
     <Text style={styles.helpButtonText}>Помощь оказана</Text>
   </TouchableOpacity>
 )}
-
-
-
+ 
+ 
             </View>
           ))}
           <TouchableOpacity
@@ -675,14 +690,13 @@ const submitReview = async () => {
           onPress={logout}>
           <Text style={styles.logoutButtonText}>Выйти</Text>
         </TouchableOpacity>
-
+ 
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={deleteAccount}>
           <Text style={styles.deleteButtonText}>Удалить аккаунт</Text>
         </TouchableOpacity>
-
-
+ 
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => setStep('createRequest')}>
@@ -690,7 +704,7 @@ const submitReview = async () => {
           </TouchableOpacity>
         </ScrollView>
       )}
-
+ 
       {step === 'browseRequests' && (
         <ScrollView style={{ width: '100%' }}>
           <Text style={styles.question}>Кто рядом нуждается в помощи?</Text>
@@ -720,14 +734,14 @@ const submitReview = async () => {
 >
   <Text style={styles.roleButtonText}>🎁 Что я готов отдать сейчас</Text>
 </TouchableOpacity>
-
+ 
           {loading && <Text>Загрузка...</Text>}
           {browseViewMode === 'list' && (
   <>
   {!loading && requests.length === 0 && (
     <Text style={styles.emptyText}>Активных запросов пока нет</Text>
   )}
-
+ 
   {requests.map((r) => (
     <View key={r.id} style={styles.requestCard}>
       <Text style={styles.requestTitle}>
@@ -743,9 +757,8 @@ const submitReview = async () => {
   {' · '}
   {r.distance_km ? `${r.distance_km.toFixed(1)} км` : ''}
 </Text>
-
-
-
+ 
+ 
       {respondedIds.includes(r.id) ? (
        <>
   <Text style={styles.respondedText}>✓ Вы откликнулись</Text>
@@ -756,15 +769,14 @@ const submitReview = async () => {
   setReviewToUserId(r.user_id);
   completeRequest(r.id);
 }}
-
+ 
       disabled={loading}>
       <Text style={styles.helpButtonText}>Помощь оказана</Text>
     </TouchableOpacity>
   )}
 </>
-
-
-
+ 
+ 
       ) : (
         <>
         <TouchableOpacity
@@ -843,23 +855,21 @@ const submitReview = async () => {
   </View>
   </>
 )}
-
+ 
 <TouchableOpacity
           style={styles.logoutButton}
           onPress={logout}>
           <Text style={styles.logoutButtonText}>Выйти</Text>
         </TouchableOpacity>
-
+ 
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={deleteAccount}>
           <Text style={styles.deleteButtonText}>Удалить аккаунт</Text>
         </TouchableOpacity>
-
-
-
-
-
+ 
+ 
+ 
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => setStep('role')}>
@@ -874,7 +884,7 @@ const submitReview = async () => {
       {!loading && offers.length === 0 && (
         <Text style={styles.emptyText}>Пока никто ничего не предлагает</Text>
         )}
-
+ 
         {offers.map((o) => (
           <View key={o.id} style={styles.requestCard}>
             <Text style={styles.requestTitle}>
@@ -886,7 +896,7 @@ const submitReview = async () => {
             <Text onPress={() => openProfile(o.user_id)} style={{ textDecorationLine: 'underline' }}>
               {o.user_name}
             </Text>
-
+ 
             <TouchableOpacity
               style={styles.helpButton}
               onPress={() => respondToRequest(o.id)}
@@ -895,7 +905,7 @@ const submitReview = async () => {
             </TouchableOpacity>
           </View>
         ))}
-
+ 
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => setStep('neederChoice')}>
@@ -903,19 +913,45 @@ const submitReview = async () => {
         </TouchableOpacity>
       </ScrollView>
     )}
-
+ 
     </View>
   );
 }
-
+ 
 const styles = StyleSheet.create({
+  googleButton: {
+    width: '100%',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  googleButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  appleButton: {
+    width: '100%',
+    height: 52,
+    marginBottom: 12,
+  },
+  orText: {
+    color: '#999',
+    fontSize: 14,
+    marginTop: 12,
+    marginBottom: 12,
+  },
   expiryHint: {
     fontSize: 13,
     color: '#888',
     marginBottom: 10,
     fontStyle: 'italic',
   },
-
+ 
   donateButton: {
   marginTop: 24,
   padding: 12,
@@ -943,12 +979,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   donateButtonText: {
-
+ 
    color: '#B8860B',
   fontWeight: '600',
   fontSize: 15,
 },
-
+ 
   mapButton: {
     backgroundColor: '#eee',
     padding: 12,
@@ -960,7 +996,7 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '600',
   },
-
+ 
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -1125,8 +1161,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-
-
+ 
   respondedText: {
     marginTop: 10,
     color: '#2E7D32',
