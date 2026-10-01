@@ -281,7 +281,7 @@ const deleteAccount = () => {
     setLoading(true);
     try {
       const res = await fetch(
-        `${API_URL}/api/requests?lat=${userLat}&lng=${userLng}`
+        `${API_URL}/api/requests?lat=${userLat}&lng=${userLng}&type=need`
       );
  
       const data = await res.json();
@@ -331,7 +331,7 @@ const deleteAccount = () => {
           'Вы откликнулись!',
           `Свяжитесь с ${
             data.requester?.name || 'человеком'
-          } по телефону: ${phone}`
+          } по телефону: ${phone}\n\nВстречайтесь днём в людных местах. Помощь в «Рядом» всегда бесплатна — не переводите и не просите деньги.`
         );
         setRespondedIds([...respondedIds, requestId]);
       } else {
@@ -399,6 +399,43 @@ const submitReview = async () => {
  
  
  
+  const sendReport = async (requestId, reason) => {
+    try {
+      const res = await fetch(`${API_URL}/api/requests/${requestId}/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reporter_id: userId, reason: reason || '' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        Alert.alert('Спасибо', 'Жалоба отправлена, мы проверим объявление.');
+      } else {
+        Alert.alert('Ошибка', data.error || 'Не удалось отправить жалобу');
+      }
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+  };
+
+  const confirmReport = (requestId) => {
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        'Пожаловаться',
+        'Опишите, в чём нарушение (необязательно)',
+        [
+          { text: 'Отмена', style: 'cancel' },
+          { text: 'Отправить', onPress: (text) => sendReport(requestId, text) },
+        ],
+        'plain-text'
+      );
+    } else {
+      Alert.alert('Пожаловаться', 'Сообщить о нарушении в этом объявлении?', [
+        { text: 'Отмена', style: 'cancel' },
+        { text: 'Пожаловаться', onPress: () => sendReport(requestId, '') },
+      ]);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Рядом</Text>
@@ -508,6 +545,11 @@ const submitReview = async () => {
               <Text style={styles.categoryButtonText}>👕 Одежда</Text>
             </TouchableOpacity>
           </View>
+<View style={styles.safetyBox}>
+  <Text style={styles.safetyText}>
+    🤝 Помощь в «Рядом» всегда бесплатна. Не просите и не переводите деньги, не вносите «предоплату за доставку».
+  </Text>
+</View>
 {category === 'food' && (
   <Text style={styles.expiryHint}>
     ⏱ Объявления о еде автоматически скрываются через 24 часа
@@ -708,6 +750,11 @@ const submitReview = async () => {
       {step === 'browseRequests' && (
         <ScrollView style={{ width: '100%' }}>
           <Text style={styles.question}>Кто рядом нуждается в помощи?</Text>
+          <View style={styles.safetyBox}>
+            <Text style={styles.safetyText}>
+              🛡 Встречайтесь днём в людных местах. Помощь всегда бесплатна — не переводите деньги.
+            </Text>
+          </View>
           <View style={{ flexDirection: 'row', marginBottom: 12 }}>
   <TouchableOpacity
     style={[styles.viewModeButton, browseViewMode === 'list' && styles.viewModeButtonActive]}
@@ -787,34 +834,7 @@ const submitReview = async () => {
         </TouchableOpacity>
                    <TouchableOpacity
     style={{ marginTop: 6, alignItems: 'center' }}
-    onPress={() => {
-      if (Platform.OS === 'ios') {
-        Alert.prompt(
-          'Пожаловаться',
-          'Опишите, в чём нарушение (необязательно)',
-          [
-            { text: 'Отмена', style: 'cancel' },
-            {
-              text: 'Отправить',
-              onPress: () => Alert.alert('Спасибо', 'Жалоба отправлена, мы проверим объявление.'),
-            },
-          ],
-          'plain-text'
-        );
-      } else {
-        Alert.alert(
-          'Пожаловаться',
-          'Сообщить о нарушении в этом объявлении?',
-          [
-            { text: 'Отмена', style: 'cancel' },
-            {
-              text: 'Пожаловаться',
-              onPress: () => Alert.alert('Спасибо', 'Жалоба отправлена, мы проверим объявление.'),
-            },
-          ]
-        );
-      }
-    }}
+    onPress={() => confirmReport(r.id)}
   >
     <Text style={{ color: '#999', fontSize: 12 }}>⚠️ Пожаловаться</Text>
   </TouchableOpacity>
@@ -839,9 +859,9 @@ const submitReview = async () => {
     <Text style={[styles.viewModeText, mapCategoryFilter === 'food' && styles.viewModeTextActive]}>🍲 Еда</Text>
   </TouchableOpacity>
   <TouchableOpacity
-    style={[styles.viewModeButton, mapCategoryFilter === 'clothes' && styles.viewModeButtonActive]}
-    onPress={() => setMapCategoryFilter('clothes')}>
-    <Text style={[styles.viewModeText, mapCategoryFilter === 'clothes' && styles.viewModeTextActive]}>👕 Одежда</Text>
+    style={[styles.viewModeButton, mapCategoryFilter === 'clothing' && styles.viewModeButtonActive]}
+    onPress={() => setMapCategoryFilter('clothing')}>
+    <Text style={[styles.viewModeText, mapCategoryFilter === 'clothing' && styles.viewModeTextActive]}>👕 Одежда</Text>
   </TouchableOpacity>
 </View>         
   <View style={{ height: 400, width: '100%', marginBottom: 16 }}>
@@ -880,6 +900,11 @@ const submitReview = async () => {
     {step === 'browseOffers' && (
       <ScrollView style={{ width: '100%' }}>
       <Text style={styles.question}>Что предлагают рядом</Text>
+      <View style={styles.safetyBox}>
+        <Text style={styles.safetyText}>
+          🛡 Встречайтесь днём в людных местах. Помощь всегда бесплатна — не переводите деньги.
+        </Text>
+      </View>
       {loading && <Text>Загрузка...</Text>}
       {!loading && offers.length === 0 && (
         <Text style={styles.emptyText}>Пока никто ничего не предлагает</Text>
@@ -903,6 +928,11 @@ const submitReview = async () => {
               disabled={loading}>
               <Text style={styles.helpButtonText}>Взять</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={{ marginTop: 6, alignItems: 'center' }}
+              onPress={() => confirmReport(o.id)}>
+              <Text style={{ color: '#999', fontSize: 12 }}>⚠️ Пожаловаться</Text>
+            </TouchableOpacity>
           </View>
         ))}
  
@@ -919,6 +949,18 @@ const submitReview = async () => {
 }
  
 const styles = StyleSheet.create({
+  safetyBox: {
+    width: '100%',
+    backgroundColor: '#FFF8E1',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 14,
+  },
+  safetyText: {
+    fontSize: 13,
+    color: '#6D4C00',
+    lineHeight: 18,
+  },
   googleButton: {
     width: '100%',
     backgroundColor: '#fff',
