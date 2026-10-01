@@ -141,6 +141,7 @@ const [profileReviews, setProfileReviews] = useState([]);
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           identityToken: credential.identityToken,
+          authorizationCode: credential.authorizationCode,
           fullName,
         }),
       });
