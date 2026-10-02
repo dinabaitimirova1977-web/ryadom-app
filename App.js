@@ -18,10 +18,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
 import * as ExpoLinking from 'expo-linking';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import Constants from 'expo-constants';
 
 WebBrowser.maybeCompleteAuthSession();
  
 const API_URL = 'https://ryadom-backend-production.up.railway.app';
+
+// Кнопка «Стать партнёром», цена и оплата есть только в APK (в App Store и Google Play их нет).
+// В сборке APK задаётся EXPO_PUBLIC_DISTRIBUTION=apk; в Expo Go (Snack) видно для проверки.
+const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
+const IS_APK = process.env.EXPO_PUBLIC_DISTRIBUTION === 'apk' || IS_EXPO_GO;
+const KASPI_PAY_URL = 'https://pay.kaspi.kz/pay/y0lpmrri';
+const PARTNER_PRICE = '25 000 ₸';
  
 export default function App() {
   const [step, setStep] = useState('phone'); // phone (экран входа), role, createRequest, browseRequests
@@ -52,6 +60,15 @@ const [reviewComment, setReviewComment] = useState('');
 const [profileVisible, setProfileVisible] = useState(false);
 const [profileData, setProfileData] = useState(null);
 const [profileReviews, setProfileReviews] = useState([]);
+const [venueVisible, setVenueVisible] = useState(false);
+const [cafesOnly, setCafesOnly] = useState(false);
+const [venueData, setVenueData] = useState(null);
+const [partnerInfo, setPartnerInfo] = useState(null);
+const [partnerStatus, setPartnerStatus] = useState('none');
+const [venueName, setVenueName] = useState('');
+const [venueAddress, setVenueAddress] = useState('');
+const [venueHours, setVenueHours] = useState('');
+const [venuePhone, setVenuePhone] = useState('');
   useEffect(() => {
     const loadSavedUser = async () => {
       const savedId = await AsyncStorage.getItem('userId');
@@ -400,6 +417,98 @@ const submitReview = async () => {
  
  
  
+  // ===== Партнёры =====
+  const openVenue = async (ownerId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/partners/by-user/${ownerId}`);
+      const data = await res.json();
+      if (data.partner) {
+        setVenueData(data.partner);
+        setVenueVisible(true);
+      }
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+  };
+
+  const openDirections = (v) => {
+    const query = v.lat && v.lng ? `${v.lat},${v.lng}` : encodeURIComponent(v.address || v.venue_name);
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+  };
+
+  const loadMyPartner = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/partners/my/${userId}`);
+      const data = await res.json();
+      setPartnerInfo(data.partner || null);
+      setPartnerStatus(data.status || 'none');
+      if (data.partner) {
+        setVenueName(data.partner.venue_name || '');
+        setVenueAddress(data.partner.address || '');
+        setVenueHours(data.partner.hours || '');
+        setVenuePhone(data.partner.phone || '');
+      }
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+    setLoading(false);
+  };
+
+  const applyPartner = async () => {
+    if (!venueName.trim() || !venueAddress.trim()) {
+      Alert.alert('Ошибка', 'Укажите название и адрес заведения');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/partners/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          venue_name: venueName.trim(),
+          address: venueAddress.trim(),
+          hours: venueHours.trim(),
+          phone: venuePhone.trim(),
+          lat: userLat,
+          lng: userLng,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPartnerInfo(data.partner);
+        setPartnerStatus('pending');
+        Alert.alert('Заявка отправлена', 'Мы проверим её и подключим вас в течение дня.');
+      } else {
+        Alert.alert('Ошибка', data.error || 'Не удалось отправить заявку');
+      }
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+    setLoading(false);
+  };
+
+  const payPartner = () => {
+    Alert.alert(
+      'Оплата через Kaspi',
+      `Оплатите ${PARTNER_PRICE} и в комментарии к платежу укажите название заведения. Статус продлится в течение дня после оплаты.`,
+      [
+        { text: 'Отмена', style: 'cancel' },
+        { text: 'Перейти к оплате', onPress: () => Linking.openURL(KASPI_PAY_URL) },
+      ]
+    );
+  };
+
+  const renderPartnerBadge = (item) =>
+    item.is_partner ? (
+      <TouchableOpacity onPress={() => openVenue(item.user_id)} style={styles.partnerBadge}>
+        <Text style={styles.partnerBadgeText}>
+          ⭐ Партнёр Рядом{item.partner_venue_name ? ` · ${item.partner_venue_name}` : ''}
+        </Text>
+      </TouchableOpacity>
+    ) : null;
+
   const sendReport = async (requestId, reason) => {
     try {
       const res = await fetch(`${API_URL}/api/requests/${requestId}/report`, {
@@ -485,6 +594,17 @@ const submitReview = async () => {
             <Text style={styles.roleButtonText}>🤝 Помогающий</Text>
             <Text style={styles.roleButtonSubtext}>Хочу помочь соседям</Text>
           </TouchableOpacity>
+          {IS_APK && (
+            <TouchableOpacity
+              style={styles.roleButton}
+              onPress={() => {
+                loadMyPartner();
+                setStep('partner');
+              }}>
+              <Text style={styles.roleButtonText}>🏪 Для кафе и ресторанов</Text>
+              <Text style={styles.roleButtonSubtext}>Стать партнёром Рядом</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.donateButton} onPress={donate}>
   <Text style={styles.donateButtonText}>💛 Помощь проекту</Text>
 </TouchableOpacity>
@@ -506,8 +626,21 @@ const submitReview = async () => {
             </TouchableOpacity>
  
             <TouchableOpacity
+              style={[styles.roleButton, styles.cafesButton]}
+              onPress={() => {
+                setCafesOnly(true);
+                loadOffers();
+                getUserLocation();
+                setStep('browseOffers');
+              }}>
+              <Text style={styles.roleButtonText}>🍽 Кафе рядом раздают еду</Text>
+              <Text style={styles.roleButtonSubtext}>Бесплатная еда от кафе-партнёров</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={styles.roleButton}
               onPress={() => {
+                setCafesOnly(false);
                 loadOffers();
                 getUserLocation();
                 setStep('browseOffers');
@@ -798,11 +931,14 @@ const submitReview = async () => {
       {r.description ? (
         <Text style={styles.requestDesc}>{r.description}</Text>
       ) : null}
+      {renderPartnerBadge(r)}
       <Text style={styles.requestMeta}>
-  <Text onPress={() => openProfile(r.user_id)} style={{ textDecorationLine: 'underline' }}>
-    {r.user_name}
-  </Text>
-  {' · '}
+  {!r.is_partner && (
+    <Text onPress={() => openProfile(r.user_id)} style={{ textDecorationLine: 'underline' }}>
+      {r.user_name}
+    </Text>
+  )}
+  {!r.is_partner && ' · '}
   {r.distance_km ? `${r.distance_km.toFixed(1)} км` : ''}
 </Text>
  
@@ -898,20 +1034,167 @@ const submitReview = async () => {
           </TouchableOpacity>
                   </ScrollView>
       )}
+    {step === 'partner' && (
+      <ScrollView style={{ width: '100%' }}>
+        <Text style={styles.question}>Партнёрство для кафе и ресторанов</Text>
+
+        <View style={styles.partnerInfoBox}>
+          <Text style={styles.partnerInfoTitle}>Что получает партнёр</Text>
+          <Text style={styles.partnerInfoText}>⭐ Отметка «Партнёр Рядом» на ваших объявлениях</Text>
+          <Text style={styles.partnerInfoText}>📍 Страница заведения с адресом и маршрутом</Text>
+          <Text style={styles.partnerInfoText}>⬆️ Ваши объявления о раздаче еды — выше в списке</Text>
+          <Text style={styles.partnerInfoText}>📣 Упоминание в наших Instagram и TikTok</Text>
+          <Text style={[styles.partnerInfoText, { marginTop: 10, fontWeight: 'bold' }]}>
+            Первый месяц — бесплатно, далее {PARTNER_PRICE} в месяц
+          </Text>
+        </View>
+
+        {loading && <Text>Загрузка...</Text>}
+
+        {!loading && partnerStatus === 'pending' && (
+          <View style={styles.requestCard}>
+            <Text style={styles.requestTitle}>⏳ Заявка на проверке</Text>
+            <Text style={styles.requestDesc}>
+              {venueName} · {venueAddress}
+            </Text>
+            <Text style={styles.requestMeta}>Мы подключим вас в течение дня.</Text>
+          </View>
+        )}
+
+        {!loading && partnerStatus === 'active' && partnerInfo && (
+          <View style={styles.requestCard}>
+            <Text style={styles.requestTitle}>⭐ Вы партнёр Рядом</Text>
+            <Text style={styles.requestDesc}>{partnerInfo.venue_name}</Text>
+            <Text style={styles.requestMeta}>
+              Действует до {new Date(partnerInfo.paid_until).toLocaleDateString('ru-RU')}
+            </Text>
+            <TouchableOpacity
+              style={[styles.button, { marginTop: 12 }]}
+              onPress={() => {
+                setRequestType('offer');
+                setCategory('food');
+                setTitle('');
+                setDescription('');
+                setStep('createRequest');
+              }}>
+              <Text style={styles.buttonText}>🍲 Раздать еду сейчас</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.helpButton, { backgroundColor: '#888' }]} onPress={payPartner}>
+              <Text style={styles.helpButtonText}>Продлить — оплатить через Kaspi</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!loading && partnerStatus === 'expired' && partnerInfo && (
+          <View style={styles.requestCard}>
+            <Text style={styles.requestTitle}>Срок партнёрства истёк</Text>
+            <Text style={styles.requestDesc}>
+              Оплатите {PARTNER_PRICE}, чтобы вернуть отметку «Партнёр Рядом» и поднятие объявлений.
+            </Text>
+            <TouchableOpacity style={styles.helpButton} onPress={payPartner}>
+              <Text style={styles.helpButtonText}>Оплатить через Kaspi</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!loading && (partnerStatus === 'none' || partnerStatus === 'rejected') && (
+          <>
+            {partnerStatus === 'rejected' && (
+              <Text style={styles.noResponseText}>
+                Предыдущая заявка не одобрена. Проверьте данные и отправьте снова.
+              </Text>
+            )}
+            <TextInput
+              style={styles.input}
+              placeholder="Название заведения"
+              value={venueName}
+              onChangeText={setVenueName}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Адрес"
+              value={venueAddress}
+              onChangeText={setVenueAddress}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Часы работы (например, 10:00–22:00)"
+              value={venueHours}
+              onChangeText={setVenueHours}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Телефон заведения"
+              value={venuePhone}
+              onChangeText={setVenuePhone}
+              keyboardType="phone-pad"
+            />
+            <TouchableOpacity style={styles.mapButton} onPress={() => setMapVisible(true)}>
+              <Text style={styles.mapButtonText}>📍 Отметить заведение на карте</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, { marginTop: 14 }]}
+              onPress={applyPartner}
+              disabled={loading}>
+              <Text style={styles.buttonText}>Отправить заявку</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        <TouchableOpacity style={styles.backButton} onPress={() => setStep('role')}>
+          <Text style={styles.backButtonText}>← Назад</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    )}
+
+    <Modal visible={venueVisible} animationType="slide" transparent={true}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
+        <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 20 }}>
+          {venueData && (
+            <>
+              <Text style={styles.partnerBadgeText}>⭐ Партнёр Рядом</Text>
+              <Text style={[styles.welcome, { textAlign: 'left', marginTop: 8 }]}>{venueData.venue_name}</Text>
+              <Text style={styles.requestDesc}>📍 {venueData.address}</Text>
+              {venueData.hours ? <Text style={styles.requestDesc}>🕒 {venueData.hours}</Text> : null}
+              {venueData.phone ? (
+                <Text
+                  style={[styles.requestDesc, { textDecorationLine: 'underline' }]}
+                  onPress={() => Linking.openURL(`tel:${venueData.phone.replace(/[^+\d]/g, '')}`)}>
+                  📞 {venueData.phone}
+                </Text>
+              ) : null}
+              <TouchableOpacity style={styles.helpButton} onPress={() => openDirections(venueData)}>
+                <Text style={styles.helpButtonText}>Как добраться</Text>
+              </TouchableOpacity>
+            </>
+          )}
+          <TouchableOpacity
+            style={{ marginTop: 12, alignItems: 'center' }}
+            onPress={() => setVenueVisible(false)}>
+            <Text style={{ color: '#999' }}>Закрыть</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+
     {step === 'browseOffers' && (
       <ScrollView style={{ width: '100%' }}>
-      <Text style={styles.question}>Что предлагают рядом</Text>
+      <Text style={styles.question}>
+        {cafesOnly ? '🍽 Кафе рядом раздают еду' : 'Что предлагают рядом'}
+      </Text>
       <View style={styles.safetyBox}>
         <Text style={styles.safetyText}>
           🛡 Встречайтесь днём в людных местах. Помощь всегда бесплатна — не переводите деньги.
         </Text>
       </View>
       {loading && <Text>Загрузка...</Text>}
-      {!loading && offers.length === 0 && (
-        <Text style={styles.emptyText}>Пока никто ничего не предлагает</Text>
+      {!loading && offers.filter((o) => !cafesOnly || o.is_partner).length === 0 && (
+        <Text style={styles.emptyText}>
+          {cafesOnly ? 'Сейчас кафе рядом ничего не раздают. Загляните позже!' : 'Пока никто ничего не предлагает'}
+        </Text>
         )}
  
-        {offers.map((o) => (
+        {offers.filter((o) => !cafesOnly || o.is_partner).map((o) => (
           <View key={o.id} style={styles.requestCard}>
             <Text style={styles.requestTitle}>
               {o.category === 'food' ? '🍲' : '👕'} {o.title}
@@ -919,9 +1202,12 @@ const submitReview = async () => {
             {o.description ? (
               <Text style={styles.requestDesc}>{o.description}</Text>
             ) : null}
-            <Text onPress={() => openProfile(o.user_id)} style={{ textDecorationLine: 'underline' }}>
-              {o.user_name}
-            </Text>
+            {renderPartnerBadge(o)}
+            {!o.is_partner && (
+              <Text onPress={() => openProfile(o.user_id)} style={{ textDecorationLine: 'underline' }}>
+                {o.user_name}
+              </Text>
+            )}
  
             <TouchableOpacity
               style={styles.helpButton}
@@ -950,6 +1236,41 @@ const submitReview = async () => {
 }
  
 const styles = StyleSheet.create({
+  cafesButton: {
+    borderColor: '#F2C94C',
+    backgroundColor: '#FFFBEA',
+  },
+  partnerBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFF3CD',
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+  },
+  partnerBadgeText: {
+    color: '#8A6D00',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  partnerInfoBox: {
+    width: '100%',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 16,
+  },
+  partnerInfoTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    marginBottom: 8,
+  },
+  partnerInfoText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+  },
   safetyBox: {
     width: '100%',
     backgroundColor: '#FFF8E1',
