@@ -17,8 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.dinabai77.ryadom",
       "usesAppleSignIn": true,
-      "infoPlist": {
-      }
+      "infoPlist": {}
     },
     "android": {
       "package": "com.dinabai77.ryadom",
@@ -39,6 +38,12 @@
       "eas": {
         "projectId": "e9dd0ae9-9345-44ec-b466-b58a58df9f2f"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e9dd0ae9-9345-44ec-b466-b58a58df9f2f"
     }
   }
 }
