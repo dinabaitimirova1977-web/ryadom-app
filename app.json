@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ryadom",
     "slug": "snack-ff91e5b7-50ed-4491-b1b5-bd6641df853d",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
