@@ -1,26 +1,1563 @@
-{
-  "license": "0BSD",
-  "main": "index.js",
-  "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
-  },
-  "dependencies": {
-    "expo": "~54.0.37",
-    "expo-status-bar": "~3.0.9",
-    "react": "19.1.0",
-    "react-native": "0.81.5",
-    "expo-location": "~19.0.8",
-    "@expo/vector-icons": "^15.0.3",
-    "react-native-paper": "4.9.2",
-    "react-native-webview": "13.15.0",
-    "@react-native-async-storage/async-storage": "^2.1.0",
-    "expo-web-browser": "~15.0.0",
-    "expo-linking": "~8.0.0",
-    "expo-apple-authentication": "~8.0.0",
-    "expo-constants": "~18.0.0"
-  },
-  "private": true
+import { useState, useEffect } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+  Modal,
+  Linking,
+    Platform,
+} from "react-native";
+ 
+import * as Location from 'expo-location';
+import { WebView } from 'react-native-webview';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as WebBrowser from 'expo-web-browser';
+import * as ExpoLinking from 'expo-linking';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
+
+WebBrowser.maybeCompleteAuthSession();
+ 
+const API_URL = 'https://ryadom-backend-production.up.railway.app';
+
+// Кнопка «Стать партнёром», цена и оплата есть только в APK для кафе (канал apk-partners).
+// В App Store, Google Play и APK для всех их нет. В Expo Go (Snack) видно для проверки.
+const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
+const IS_APK = Updates.channel === 'apk-partners' || IS_EXPO_GO;
+const KASPI_PAY_URL = 'https://pay.kaspi.kz/pay/y0lpmrri';
+const PARTNER_PRICE = '25 000 ₸';
+ 
+export default function App() {
+  const [step, setStep] = useState('phone'); // phone (экран входа), role, createRequest, browseRequests
+  const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState(null);
+  const [userName, setUserName] = useState('');
+  const [appleAvailable, setAppleAvailable] = useState(false);
+ 
+  const [category, setCategory] = useState('food');
+  const [requestType, setRequestType] = useState('need');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+ 
+  const [requests, setRequests] = useState([]);
+  const [offers, setOffers] = useState([]);
+  const [respondedIds, setRespondedIds] = useState([]);
+  const [myRequests, setMyRequests] = useState([]);
+  const [userLat, setUserLat] = useState(47.1164);
+  const [userLng, setUserLng] = useState(51.9126);
+  const [mapVisible, setMapVisible] = useState(false);
+  const [browseViewMode, setBrowseViewMode] = useState('list');
+  const [mapCategoryFilter, setMapCategoryFilter] = useState('all');
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+const [reviewRequestId, setReviewRequestId] = useState(null);
+const [reviewToUserId, setReviewToUserId] = useState(null);
+const [reviewRating, setReviewRating] = useState(5);
+const [reviewComment, setReviewComment] = useState('');
+const [profileVisible, setProfileVisible] = useState(false);
+const [profileData, setProfileData] = useState(null);
+const [profileReviews, setProfileReviews] = useState([]);
+const [venueVisible, setVenueVisible] = useState(false);
+const [cafesOnly, setCafesOnly] = useState(false);
+const [venueData, setVenueData] = useState(null);
+const [partnerInfo, setPartnerInfo] = useState(null);
+const [partnerStatus, setPartnerStatus] = useState('none');
+const [venueName, setVenueName] = useState('');
+const [venueAddress, setVenueAddress] = useState('');
+const [venueHours, setVenueHours] = useState('');
+const [venuePhone, setVenuePhone] = useState('');
+  useEffect(() => {
+    const loadSavedUser = async () => {
+      const savedId = await AsyncStorage.getItem('userId');
+      const savedName = await AsyncStorage.getItem('userName');
+      if (savedId) {
+        setUserId(savedId);
+        setUserName(savedName || 'Пользователь');
+        setStep('role');
+      }
+    };
+    loadSavedUser();
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync()
+        .then(setAppleAvailable)
+        .catch(() => setAppleAvailable(false));
+    }
+  }, []);
+
+  // Общий шаг после входа через Google или Apple
+  const saveUser = async (user) => {
+    const name = user.name || 'Пользователь';
+    setUserId(user.id);
+    setUserName(name);
+    await AsyncStorage.setItem('userId', String(user.id));
+    await AsyncStorage.setItem('userName', name);
+    setStep('role');
+  };
+
+  const loginWithGoogle = async () => {
+    setLoading(true);
+    try {
+      const redirectUrl = 'ryadom://auth';
+      const startUrl = `${API_URL}/api/auth/google/start?redirect=${encodeURIComponent(redirectUrl)}`;
+      const result = await WebBrowser.openAuthSessionAsync(startUrl, redirectUrl);
+
+      if (result.type !== 'success' || !result.url) {
+        setLoading(false);
+        return; // пользователь закрыл окно
+      }
+
+      const { queryParams } = ExpoLinking.parse(result.url);
+      const authCode = queryParams && queryParams.code;
+      if (!authCode) {
+        Alert.alert('Ошибка', 'Google не вернул код входа. Попробуйте ещё раз.');
+        setLoading(false);
+        return;
+      }
+
+      const res = await fetch(`${API_URL}/api/auth/exchange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: authCode }),
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        await saveUser(data.user);
+      } else {
+        Alert.alert('Ошибка', data.error || 'Не удалось войти через Google');
+      }
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+    setLoading(false);
+  };
+
+  const loginWithApple = async () => {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      setLoading(true);
+      const fullName = [
+        credential.fullName?.givenName,
+        credential.fullName?.familyName,
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      const res = await fetch(`${API_URL}/api/auth/apple`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identityToken: credential.identityToken,
+          authorizationCode: credential.authorizationCode,
+          fullName,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        await saveUser(data.user);
+      } else {
+        Alert.alert('Ошибка', data.error || 'Не удалось войти через Apple');
+      }
+    } catch (e) {
+      if (e.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Ошибка', e.message);
+      }
+    }
+    setLoading(false);
+  };
+ 
+ 
+const openProfile = async (targetUserId) => {
+  try {
+    const resUser = await fetch(`${API_URL}/api/users/${targetUserId}`);
+    const dataUser = await resUser.json();
+    const resReviews = await fetch(`${API_URL}/api/requests/reviews/${targetUserId}`);
+    const dataReviews = await resReviews.json();
+    setProfileData(dataUser.user || null);
+    setProfileReviews(dataReviews.reviews || []);
+    setProfileVisible(true);
+  } catch (e) {
+    Alert.alert('Ошибка сети', e.message);
+  }
+};
+ 
+ 
+  const donate = () => {
+  Linking.openURL('https://dinabaitimirova1977-web.github.io/ryadom-app/support.html');
+  };
+  const logout = async () => {
+  await AsyncStorage.removeItem('userId');
+  await AsyncStorage.removeItem('userName');
+  setUserId(null);
+  setStep('phone');
+};
+const deleteAccount = () => {
+  Alert.alert(
+    'Удалить аккаунт',
+    'Это действие необратимо. Все ваши данные будут удалены.',
+    [
+      { text: 'Отмена', style: 'cancel' },
+      {
+        text: 'Удалить',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const res = await fetch(`${API_URL}/api/users/${userId}`, { method: 'DELETE' });
+            if (res.ok) {
+              await AsyncStorage.clear();
+              setUserId(null);
+                        setStep('phone');
+              Alert.alert('Готово', 'Аккаунт удалён');
+            } else {
+              Alert.alert('Ошибка', 'Не удалось удалить аккаунт');
+            }
+          } catch (e) {
+            Alert.alert('Ошибка сети',e.message);
+          }
+        },
+      },
+    ]
+  );
+};
+ 
+  const getUserLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Геолокация',
+          'Без доступа к геолокации будут показаны примерные координаты (Атырау)'
+        );
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({});
+      setUserLat(loc.coords.latitude);
+      setUserLng(loc.coords.longitude);
+    } catch (e) {
+      console.log('Location error:', e.message);
+    }
+  };
+ 
+  
+ 
+ 
+  const selectRole = (selectedRole) => {
+   if (selectedRole === 'needer') {
+      setStep('neederChoice');
+    } else {
+          loadRequests();
+      setStep('browseRequests');
+    }
+  };
+ 
+  const createRequest = async () => {
+    if (!title) {
+      Alert.alert('Ошибка', 'Введите заголовок запроса');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          category,
+          title,
+          description,
+          lat: userLat,
+          lng: userLng,
+          type: requestType,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        Alert.alert('Готово!', 'Ваш запрос опубликован');
+        setTitle('');
+        setDescription('');
+        setStep('role');
+      } else {
+        Alert.alert('Ошибка', data.error || 'Не удалось создать запрос');
+      }
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+    setLoading(false);
+  };
+ 
+  const loadRequests = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${API_URL}/api/requests?lat=${userLat}&lng=${userLng}&type=need`
+      );
+ 
+      const data = await res.json();
+      setRequests(data.requests || []);
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+    setLoading(false);
+  };
+  const loadOffers = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${API_URL}/api/requests?lat=${userLat}&lng=${userLng}&type=offer`
+      );
+      const data = await res.json();
+      setOffers(data.requests || []);
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+    setLoading(false);
+  };
+  const loadMyRequests = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/requests/my/${userId}`);
+      const data = await res.json();
+      setMyRequests(data.requests || []);
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+    setLoading(false);
+  };
+ 
+  const respondToRequest = async (requestId) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/requests/${requestId}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ helper_id: userId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const phone = data.requester?.phone || 'не указан';
+        Alert.alert(
+          'Вы откликнулись!',
+          `Свяжитесь с ${
+            data.requester?.name || 'человеком'
+          } по телефону: ${phone}\n\nВстречайтесь днём в людных местах. Помощь в «Рядом» всегда бесплатна — не переводите и не просите деньги.`
+        );
+        setRespondedIds([...respondedIds, requestId]);
+      } else {
+        Alert.alert('Ошибка', data.error || 'Не удалось откликнуться');
+      }
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+    setLoading(false);
+  };
+const completeRequest = async (requestId) => {
+  setLoading(true);
+  try {
+    const res = await fetch(`${API_URL}/api/requests/${requestId}/complete`, {
+     method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      setReviewRequestId(requestId);
+setReviewRating(5);
+setReviewComment('');
+setReviewModalVisible(true);
+      loadMyRequests();
+      loadRequests();
+    } else {
+      Alert.alert('Ошибка', data.error || 'Не удалось завершить заявку');
+    }
+  } catch (e) {
+    Alert.alert('Ошибка сети', e.message);
+  }
+  setLoading(false);
+};
+const submitReview = async () => {
+  if (!reviewToUserId) {
+    setReviewModalVisible(false);
+    return;
+  }
+  setLoading(true);
+  try {
+    const res = await fetch(`${API_URL}/api/requests/${reviewRequestId}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from_user_id: userId,
+        to_user_id: reviewToUserId,
+        rating: reviewRating,
+        comment: reviewComment,
+      }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      Alert.alert('Спасибо!', 'Ваш отзыв сохранён');
+      setReviewModalVisible(false);
+    } else {
+      Alert.alert('Ошибка', data.error || 'Не удалось отправить отзыв');
+    }
+  } catch (e) {
+    Alert.alert('Ошибка сети', e.message);
+  }
+  setLoading(false);
+};
+ 
+ 
+ 
+ 
+  // ===== Партнёры =====
+  const openVenue = async (ownerId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/partners/by-user/${ownerId}`);
+      const data = await res.json();
+      if (data.partner) {
+        setVenueData(data.partner);
+        setVenueVisible(true);
+      }
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+  };
+
+  const openDirections = (v) => {
+    const query = v.lat && v.lng ? `${v.lat},${v.lng}` : encodeURIComponent(v.address || v.venue_name);
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+  };
+
+  const loadMyPartner = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/partners/my/${userId}`);
+      const data = await res.json();
+      setPartnerInfo(data.partner || null);
+      setPartnerStatus(data.status || 'none');
+      if (data.partner) {
+        setVenueName(data.partner.venue_name || '');
+        setVenueAddress(data.partner.address || '');
+        setVenueHours(data.partner.hours || '');
+        setVenuePhone(data.partner.phone || '');
+      }
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+    setLoading(false);
+  };
+
+  const applyPartner = async () => {
+    if (!venueName.trim() || !venueAddress.trim()) {
+      Alert.alert('Ошибка', 'Укажите название и адрес заведения');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/partners/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          venue_name: venueName.trim(),
+          address: venueAddress.trim(),
+          hours: venueHours.trim(),
+          phone: venuePhone.trim(),
+          lat: userLat,
+          lng: userLng,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPartnerInfo(data.partner);
+        setPartnerStatus('pending');
+        Alert.alert('Заявка отправлена', 'Мы проверим её и подключим вас в течение дня.');
+      } else {
+        Alert.alert('Ошибка', data.error || 'Не удалось отправить заявку');
+      }
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+    setLoading(false);
+  };
+
+  const payPartner = () => {
+    Alert.alert(
+      'Оплата через Kaspi',
+      `Оплатите ${PARTNER_PRICE} и в комментарии к платежу укажите название заведения. Статус продлится в течение дня после оплаты.`,
+      [
+        { text: 'Отмена', style: 'cancel' },
+        { text: 'Перейти к оплате', onPress: () => Linking.openURL(KASPI_PAY_URL) },
+      ]
+    );
+  };
+
+  const renderPartnerBadge = (item) =>
+    item.is_partner ? (
+      <TouchableOpacity onPress={() => openVenue(item.user_id)} style={styles.partnerBadge}>
+        <Text style={styles.partnerBadgeText}>
+          ⭐ Партнёр Рядом{item.partner_venue_name ? ` · ${item.partner_venue_name}` : ''}
+        </Text>
+      </TouchableOpacity>
+    ) : null;
+
+  const sendReport = async (requestId, reason) => {
+    try {
+      const res = await fetch(`${API_URL}/api/requests/${requestId}/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reporter_id: userId, reason: reason || '' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        Alert.alert('Спасибо', 'Жалоба отправлена, мы проверим объявление.');
+      } else {
+        Alert.alert('Ошибка', data.error || 'Не удалось отправить жалобу');
+      }
+    } catch (e) {
+      Alert.alert('Ошибка сети', e.message);
+    }
+  };
+
+  const confirmReport = (requestId) => {
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        'Пожаловаться',
+        'Опишите, в чём нарушение (необязательно)',
+        [
+          { text: 'Отмена', style: 'cancel' },
+          { text: 'Отправить', onPress: (text) => sendReport(requestId, text) },
+        ],
+        'plain-text'
+      );
+    } else {
+      Alert.alert('Пожаловаться', 'Сообщить о нарушении в этом объявлении?', [
+        { text: 'Отмена', style: 'cancel' },
+        { text: 'Пожаловаться', onPress: () => sendReport(requestId, '') },
+      ]);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Рядом</Text>
+      <Text style={styles.subtitle}>Помогаем соседям</Text>
+ 
+      {step === 'phone' && (
+        <>
+          <TouchableOpacity
+            style={styles.googleButton}
+            onPress={loginWithGoogle}
+            disabled={loading}>
+            <Text style={styles.googleButtonText}>
+              {loading ? 'Вход...' : 'Войти через Google'}
+            </Text>
+          </TouchableOpacity>
+
+          {appleAvailable && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={8}
+              style={styles.appleButton}
+              onPress={loginWithApple}
+            />
+          )}
+
+        </>
+      )}
+ 
+ 
+      {step === 'role' && (
+        <>
+          <Text style={styles.welcome}>Добро пожаловать, {userName}!</Text>
+          <Text style={styles.question}>Кто вы?</Text>
+ 
+          <TouchableOpacity
+            style={styles.roleButton}
+            onPress={() => selectRole('needer')}>
+            <Text style={styles.roleButtonText}>🙋 Нуждающийся</Text>
+            <Text style={styles.roleButtonSubtext}>Мне нужна помощь</Text>
+          </TouchableOpacity>
+ 
+          <TouchableOpacity
+            style={styles.roleButton}
+            onPress={() => selectRole('helper')}>
+            <Text style={styles.roleButtonText}>🤝 Помогающий</Text>
+            <Text style={styles.roleButtonSubtext}>Хочу помочь соседям</Text>
+          </TouchableOpacity>
+          {IS_APK && (
+            <TouchableOpacity
+              style={styles.roleButton}
+              onPress={() => {
+                loadMyPartner();
+                setStep('partner');
+              }}>
+              <Text style={styles.roleButtonText}>🏪 Для кафе и ресторанов</Text>
+              <Text style={styles.roleButtonSubtext}>Стать партнёром Рядом</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.donateButton} onPress={donate}>
+  <Text style={styles.donateButtonText}>💛 Помощь проекту</Text>
+</TouchableOpacity>
+        </>
+      )}
+ 
+      {step === 'neederChoice' && (
+          <>
+            <Text style={styles.question}>Что вы хотите сделать?</Text>
+ 
+            <TouchableOpacity
+              style={styles.roleButton}
+              onPress={() => {
+                setRequestType('need');
+                setStep('createRequest');
+              }}>
+              <Text style={styles.roleButtonText}>🙋 Мне нужна помощь</Text>
+              <Text style={styles.roleButtonSubtext}>Создать запрос о помощи</Text>
+            </TouchableOpacity>
+ 
+            <TouchableOpacity
+              style={[styles.roleButton, styles.cafesButton]}
+              onPress={() => {
+                setCafesOnly(true);
+                loadOffers();
+                getUserLocation();
+                setStep('browseOffers');
+              }}>
+              <Text style={styles.roleButtonText}>🍽 Кафе рядом раздают еду</Text>
+              <Text style={styles.roleButtonSubtext}>Бесплатная еда от кафе-партнёров</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.roleButton}
+              onPress={() => {
+                setCafesOnly(false);
+                loadOffers();
+                getUserLocation();
+                setStep('browseOffers');
+              }}>
+              <Text style={styles.roleButtonText}>🎁 Посмотреть, что предлагают</Text>
+              <Text style={styles.roleButtonSubtext}>Взять то, что отдают соседи</Text>
+            </TouchableOpacity>
+ 
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => setStep('role')}>
+              <Text style={styles.backButtonText}>← Назад</Text>
+            </TouchableOpacity>
+          </>
+        )}
+ 
+      {step === 'createRequest' && (
+        <ScrollView style={{ width: '100%' }}>
+          <Text style={styles.question}>Что вам нужно?</Text>
+ 
+          <View style={styles.categoryRow}>
+            <TouchableOpacity
+              style={[
+                styles.categoryButton,
+                category === 'food' && styles.categoryButtonSelected,
+              ]}
+              onPress={() => setCategory('food')}>
+              <Text style={styles.categoryButtonText}>🍲 Еда</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.categoryButton,
+                category === 'clothing' && styles.categoryButtonSelected,
+              ]}
+              onPress={() => setCategory('clothing')}>
+              <Text style={styles.categoryButtonText}>👕 Одежда</Text>
+            </TouchableOpacity>
+          </View>
+<View style={styles.safetyBox}>
+  <Text style={styles.safetyText}>
+    🤝 Помощь в «Рядом» всегда бесплатна. Не просите и не переводите деньги, не вносите «предоплату за доставку».
+  </Text>
+</View>
+{category === 'food' && (
+  <Text style={styles.expiryHint}>
+    ⏱ Объявления о еде автоматически скрываются через 24 часа
+  </Text>
+)}
+ 
+          <TextInput
+            style={styles.input}
+            placeholder="Коротко, что нужно"
+            value={title}
+            onChangeText={setTitle}
+          />
+          <TextInput
+            style={[styles.input, { height: 80 }]}
+            placeholder="Подробности (необязательно)"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+          />
+          <TouchableOpacity
+            style={styles.mapButton}
+            onPress={() => setMapVisible(true)}>
+            <Text style={styles.mapButtonText}>📍 Уточнить место на карте</Text>
+          </TouchableOpacity>
+ 
+          <TouchableOpacity
+            style={styles.button}
+            onPress={createRequest}
+            disabled={loading}>
+            <Text style={styles.buttonText}>
+              {loading ? 'Публикация...' : 'Опубликовать запрос'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => {
+              loadMyRequests();
+              setStep('myRequests');
+            }}>
+            <Text style={styles.linkButtonText}>📋 Мои запросы</Text>
+          </TouchableOpacity>
+ 
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setStep('role')}>
+            <Text style={styles.backButtonText}>← Назад</Text>
+          </TouchableOpacity>
+              
+ 
+ 
+              </ScrollView>
+      )}
+      <Modal visible={mapVisible} animationType="slide"><View style={{flex:1}}><WebView style={{flex:1}} source={{html:`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /><style>#map{height:100vh;width:100vw;margin:0;padding:0;}</style></head><body style="margin:0;padding:0;"><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>var map=L.map('map').setView([${userLat},${userLng}],14);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);var marker=L.marker([${userLat},${userLng}],{draggable:true}).addTo(map);function sendCoords(lat,lng){window.ReactNativeWebView.postMessage(JSON.stringify({lat:lat,lng:lng}));}marker.on('dragend',function(e){var pos=marker.getLatLng();sendCoords(pos.lat,pos.lng);});map.on('click',function(e){marker.setLatLng(e.latlng);sendCoords(e.latlng.lat,e.latlng.lng);});</script></body></html>`}} onMessage={(event)=>{const data=JSON.parse(event.nativeEvent.data);setUserLat(data.lat);setUserLng(data.lng);}} /><TouchableOpacity style={[styles.button,{margin:16}]} onPress={()=>setMapVisible(false)}><Text style={styles.buttonText}>Готово</Text></TouchableOpacity></View></Modal>
+      <Modal visible={reviewModalVisible} animationType="slide" transparent={true}>
+  <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
+    <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 20 }}>
+      <Text style={styles.question}>Оцените помощь</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'center', marginVertical: 16 }}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
+            <Text style={{ fontSize: 32, marginHorizontal: 4 }}>
+              {star <= reviewRating ? '⭐' : '☆'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <TextInput
+        style={styles.input}
+        placeholder="Комментарий (необязательно)"
+        value={reviewComment}
+        onChangeText={setReviewComment}
+        multiline
+      />
+      <TouchableOpacity
+        style={styles.button}
+        onPress={submitReview}
+        disabled={loading}>
+        <Text style={styles.buttonText}>Отправить отзыв</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={{ marginTop: 12, alignItems: 'center' }}
+        onPress={() => setReviewModalVisible(false)}>
+        <Text style={{ color: '#999' }}>Пропустить</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+<Modal visible={profileVisible} animationType="slide" transparent={true}>
+  <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
+    <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 20, maxHeight: '80%' }}>
+      {profileData && (
+        <>
+          <Text style={styles.question}>{profileData.name}</Text>
+          <Text style={{ color: '#666', marginBottom: 8 }}>{profileData.phone}</Text>
+          <Text style={{ fontSize: 18, marginBottom: 16 }}>
+            ⭐ {profileData.rating ? Number(profileData.rating).toFixed(1) : '0.0'} ({profileData.reviews_count || 0} отзывов)
+          </Text>
+          <ScrollView style={{ maxHeight: 300 }}>
+            {profileReviews.length === 0 ? (
+              <Text style={styles.emptyText}>Отзывов пока нет</Text>
+            ) : (
+              profileReviews.map((rv) => (
+                <View key={rv.id} style={styles.requestCard}>
+                  <Text>{'⭐'.repeat(rv.rating)}</Text>
+                  <Text style={{ color: '#666', marginTop: 4 }}>{rv.from_user_name}</Text>
+                  {rv.comment ? <Text style={{ marginTop: 4 }}>{rv.comment}</Text> : null}
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </>
+      )}
+      <TouchableOpacity
+        style={{ marginTop: 12, alignItems: 'center' }}
+        onPress={() => setProfileVisible(false)}>
+        <Text style={{ color: '#999' }}>Закрыть</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+ 
+ 
+ 
+ 
+      {step === 'myRequests' && (
+        <ScrollView style={{ width: '100%' }}>
+          <Text style={styles.question}>Мои запросы</Text>
+ 
+          {loading && <Text>Загрузка...</Text>}
+ 
+          {!loading && myRequests.length === 0 && (
+            <Text style={styles.emptyText}>У вас пока нет запросов</Text>
+          )}
+ 
+          {myRequests.map((r) => (
+            <View key={r.id} style={styles.requestCard}>
+              <Text style={styles.requestTitle}>
+                {r.category === 'food' ? '🍲' : '👕'} {r.title}
+              </Text>
+              {r.description ? (
+                <Text style={styles.requestDesc}>{r.description}</Text>
+              ) : null}
+ 
+              {r.responses && r.responses.length > 0 ? (
+                r.responses.map((resp) => (
+                  <View key={resp.id} style={styles.responseItem}>
+                    <Text style={styles.responseText}>
+                      🧑 <Text onPress={() => openProfile(resp.helper_id)} style={{ textDecorationLine: 'underline' }}>{resp.helper_name}</Text> · {resp.helper_phone}
+ 
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noResponseText}>
+                  Пока никто не откликнулся
+                </Text>
+              )}
+              {r.status === 'completed' ? (
+  <Text style={styles.respondedText}>✅ Завершено</Text>
+) : (
+  <TouchableOpacity
+    style={styles.helpButton}
+    onPress={() => {
+  const helperId = r.responses && r.responses.length > 0 ? r.responses[0].helper_id : null;
+  setReviewToUserId(helperId);
+  completeRequest(r.id);
+}}
+ 
+ 
+    disabled={loading}>
+    <Text style={styles.helpButtonText}>Помощь оказана</Text>
+  </TouchableOpacity>
+)}
+ 
+ 
+            </View>
+          ))}
+          <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={logout}>
+          <Text style={styles.logoutButtonText}>Выйти</Text>
+        </TouchableOpacity>
+ 
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={deleteAccount}>
+          <Text style={styles.deleteButtonText}>Удалить аккаунт</Text>
+        </TouchableOpacity>
+ 
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setStep('createRequest')}>
+            <Text style={styles.backButtonText}>← Назад</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+ 
+      {step === 'browseRequests' && (
+        <ScrollView style={{ width: '100%' }}>
+          <Text style={styles.question}>Кто рядом нуждается в помощи?</Text>
+          <View style={styles.safetyBox}>
+            <Text style={styles.safetyText}>
+              🛡 Встречайтесь днём в людных местах. Помощь всегда бесплатна — не переводите деньги.
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+  <TouchableOpacity
+    style={[styles.viewModeButton, browseViewMode === 'list' && styles.viewModeButtonActive]}
+    onPress={() => setBrowseViewMode('list')}
+  >
+    <Text style={[styles.viewModeText, browseViewMode === 'list' && styles.viewModeTextActive]}>📋 Список</Text>
+  </TouchableOpacity>
+  <TouchableOpacity
+    style={[styles.viewModeButton, browseViewMode === 'map' && styles.viewModeButtonActive]}
+    onPress={() => setBrowseViewMode('map')}
+  >
+    <Text style={[styles.viewModeText, browseViewMode === 'map' && styles.viewModeTextActive]}>🗺️ Карта</Text>
+  </TouchableOpacity>
+</View>
+<TouchableOpacity
+  style={styles.donateButton}
+  onPress={() => {
+    setRequestType('offer');
+    setCategory('food');
+    setTitle('');
+    setDescription('');
+    setStep('createRequest');
+  }}
+>
+  <Text style={styles.roleButtonText}>🎁 Что я готов отдать сейчас</Text>
+</TouchableOpacity>
+ 
+          {loading && <Text>Загрузка...</Text>}
+          {browseViewMode === 'list' && (
+  <>
+  {!loading && requests.length === 0 && (
+    <Text style={styles.emptyText}>Активных запросов пока нет</Text>
+  )}
+ 
+  {requests.map((r) => (
+    <View key={r.id} style={styles.requestCard}>
+      <Text style={styles.requestTitle}>
+        {r.category === 'food' ? '🍲' : '👕'} {r.title}
+      </Text>
+      {r.description ? (
+        <Text style={styles.requestDesc}>{r.description}</Text>
+      ) : null}
+      {renderPartnerBadge(r)}
+      <Text style={styles.requestMeta}>
+  {!r.is_partner && (
+    <Text onPress={() => openProfile(r.user_id)} style={{ textDecorationLine: 'underline' }}>
+      {r.user_name}
+    </Text>
+  )}
+  {!r.is_partner && ' · '}
+  {r.distance_km ? `${r.distance_km.toFixed(1)} км` : ''}
+</Text>
+ 
+ 
+      {respondedIds.includes(r.id) ? (
+       <>
+  <Text style={styles.respondedText}>✓ Вы откликнулись</Text>
+  {r.status !== 'completed' && (
+    <TouchableOpacity
+      style={styles.helpButton}
+      onPress={() => {
+  setReviewToUserId(r.user_id);
+  completeRequest(r.id);
+}}
+ 
+      disabled={loading}>
+      <Text style={styles.helpButtonText}>Помощь оказана</Text>
+    </TouchableOpacity>
+  )}
+</>
+ 
+ 
+      ) : (
+        <>
+        <TouchableOpacity
+          style={styles.helpButton}
+          onPress={() => respondToRequest(r.id)}
+          disabled={loading}>
+          <Text style={styles.helpButtonText}>Помочь</Text>
+        </TouchableOpacity>
+                   <TouchableOpacity
+    style={{ marginTop: 6, alignItems: 'center' }}
+    onPress={() => confirmReport(r.id)}
+  >
+    <Text style={{ color: '#999', fontSize: 12 }}>⚠️ Пожаловаться</Text>
+  </TouchableOpacity>
+  </>
+ 
+      )}
+    </View>
+  ))}
+  </>
+)}
+{browseViewMode === 'map' && (
+  <>
+<View style={{ flexDirection: 'row', marginBottom: 10 }}>
+  <TouchableOpacity
+    style={[styles.viewModeButton, mapCategoryFilter === 'all' && styles.viewModeButtonActive]}
+    onPress={() => setMapCategoryFilter('all')}>
+    <Text style={[styles.viewModeText, mapCategoryFilter === 'all' && styles.viewModeTextActive]}>Все</Text>
+  </TouchableOpacity>
+  <TouchableOpacity
+    style={[styles.viewModeButton, mapCategoryFilter === 'food' && styles.viewModeButtonActive]}
+    onPress={() => setMapCategoryFilter('food')}>
+    <Text style={[styles.viewModeText, mapCategoryFilter === 'food' && styles.viewModeTextActive]}>🍲 Еда</Text>
+  </TouchableOpacity>
+  <TouchableOpacity
+    style={[styles.viewModeButton, mapCategoryFilter === 'clothing' && styles.viewModeButtonActive]}
+    onPress={() => setMapCategoryFilter('clothing')}>
+    <Text style={[styles.viewModeText, mapCategoryFilter === 'clothing' && styles.viewModeTextActive]}>👕 Одежда</Text>
+  </TouchableOpacity>
+</View>         
+  <View style={{ height: 400, width: '100%', marginBottom: 16 }}>
+    <WebView
+      style={{ flex: 1 }}
+      source={{
+        html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /><style>#map{height:100vh;width:100vw;margin:0;padding:0;}</style></head><body style="margin:0;padding:0;"><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>var map=L.map('map').setView([${userLat},${userLng}],13);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);L.marker([${userLat},${userLng}]).addTo(map).bindPopup('Вы здесь');${requests.filter(r => mapCategoryFilter === 'all' || r.category === mapCategoryFilter).map(r =>
+ `L.marker([${r.lat},${r.lng}]).addTo(map).bindPopup(${JSON.stringify(r.title)});`).join('')}</script></body></html>`
+      }}
+    />
+  </View>
+  </>
+)}
+ 
+<TouchableOpacity
+          style={styles.logoutButton}
+          onPress={logout}>
+          <Text style={styles.logoutButtonText}>Выйти</Text>
+        </TouchableOpacity>
+ 
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={deleteAccount}>
+          <Text style={styles.deleteButtonText}>Удалить аккаунт</Text>
+        </TouchableOpacity>
+ 
+ 
+ 
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setStep('role')}>
+            <Text style={styles.backButtonText}>← Назад</Text>
+          </TouchableOpacity>
+                  </ScrollView>
+      )}
+    {step === 'partner' && (
+      <ScrollView style={{ width: '100%' }}>
+        <Text style={styles.question}>Партнёрство для кафе и ресторанов</Text>
+
+        <View style={styles.partnerInfoBox}>
+          <Text style={styles.partnerInfoTitle}>Что получает партнёр</Text>
+          <Text style={styles.partnerInfoText}>⭐ Отметка «Партнёр Рядом» на ваших объявлениях</Text>
+          <Text style={styles.partnerInfoText}>📍 Страница заведения с адресом и маршрутом</Text>
+          <Text style={styles.partnerInfoText}>⬆️ Ваши объявления о раздаче еды — выше в списке</Text>
+          <Text style={styles.partnerInfoText}>📣 Упоминание в наших Instagram и TikTok</Text>
+          <Text style={[styles.partnerInfoText, { marginTop: 10, fontWeight: 'bold' }]}>
+            Первый месяц — бесплатно, далее {PARTNER_PRICE} в месяц
+          </Text>
+        </View>
+
+        {loading && <Text>Загрузка...</Text>}
+
+        {!loading && partnerStatus === 'pending' && (
+          <View style={styles.requestCard}>
+            <Text style={styles.requestTitle}>⏳ Заявка на проверке</Text>
+            <Text style={styles.requestDesc}>
+              {venueName} · {venueAddress}
+            </Text>
+            <Text style={styles.requestMeta}>Мы подключим вас в течение дня.</Text>
+          </View>
+        )}
+
+        {!loading && partnerStatus === 'active' && partnerInfo && (
+          <View style={styles.requestCard}>
+            <Text style={styles.requestTitle}>⭐ Вы партнёр Рядом</Text>
+            <Text style={styles.requestDesc}>{partnerInfo.venue_name}</Text>
+            <Text style={styles.requestMeta}>
+              Действует до {new Date(partnerInfo.paid_until).toLocaleDateString('ru-RU')}
+            </Text>
+            <TouchableOpacity
+              style={[styles.button, { marginTop: 12 }]}
+              onPress={() => {
+                setRequestType('offer');
+                setCategory('food');
+                setTitle('');
+                setDescription('');
+                setStep('createRequest');
+              }}>
+              <Text style={styles.buttonText}>🍲 Раздать еду сейчас</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.helpButton, { backgroundColor: '#888' }]} onPress={payPartner}>
+              <Text style={styles.helpButtonText}>Продлить — оплатить через Kaspi</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!loading && partnerStatus === 'expired' && partnerInfo && (
+          <View style={styles.requestCard}>
+            <Text style={styles.requestTitle}>Срок партнёрства истёк</Text>
+            <Text style={styles.requestDesc}>
+              Оплатите {PARTNER_PRICE}, чтобы вернуть отметку «Партнёр Рядом» и поднятие объявлений.
+            </Text>
+            <TouchableOpacity style={styles.helpButton} onPress={payPartner}>
+              <Text style={styles.helpButtonText}>Оплатить через Kaspi</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!loading && (partnerStatus === 'none' || partnerStatus === 'rejected') && (
+          <>
+            {partnerStatus === 'rejected' && (
+              <Text style={styles.noResponseText}>
+                Предыдущая заявка не одобрена. Проверьте данные и отправьте снова.
+              </Text>
+            )}
+            <TextInput
+              style={styles.input}
+              placeholder="Название заведения"
+              value={venueName}
+              onChangeText={setVenueName}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Адрес"
+              value={venueAddress}
+              onChangeText={setVenueAddress}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Часы работы (например, 10:00–22:00)"
+              value={venueHours}
+              onChangeText={setVenueHours}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Телефон заведения"
+              value={venuePhone}
+              onChangeText={setVenuePhone}
+              keyboardType="phone-pad"
+            />
+            <TouchableOpacity style={styles.mapButton} onPress={() => setMapVisible(true)}>
+              <Text style={styles.mapButtonText}>📍 Отметить заведение на карте</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, { marginTop: 14 }]}
+              onPress={applyPartner}
+              disabled={loading}>
+              <Text style={styles.buttonText}>Отправить заявку</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        <TouchableOpacity style={styles.backButton} onPress={() => setStep('role')}>
+          <Text style={styles.backButtonText}>← Назад</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    )}
+
+    <Modal visible={venueVisible} animationType="slide" transparent={true}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
+        <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 20 }}>
+          {venueData && (
+            <>
+              <Text style={styles.partnerBadgeText}>⭐ Партнёр Рядом</Text>
+              <Text style={[styles.welcome, { textAlign: 'left', marginTop: 8 }]}>{venueData.venue_name}</Text>
+              <Text style={styles.requestDesc}>📍 {venueData.address}</Text>
+              {venueData.hours ? <Text style={styles.requestDesc}>🕒 {venueData.hours}</Text> : null}
+              {venueData.phone ? (
+                <Text
+                  style={[styles.requestDesc, { textDecorationLine: 'underline' }]}
+                  onPress={() => Linking.openURL(`tel:${venueData.phone.replace(/[^+\d]/g, '')}`)}>
+                  📞 {venueData.phone}
+                </Text>
+              ) : null}
+              <TouchableOpacity style={styles.helpButton} onPress={() => openDirections(venueData)}>
+                <Text style={styles.helpButtonText}>Как добраться</Text>
+              </TouchableOpacity>
+            </>
+          )}
+          <TouchableOpacity
+            style={{ marginTop: 12, alignItems: 'center' }}
+            onPress={() => setVenueVisible(false)}>
+            <Text style={{ color: '#999' }}>Закрыть</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+
+    {step === 'browseOffers' && (
+      <ScrollView style={{ width: '100%' }}>
+      <Text style={styles.question}>
+        {cafesOnly ? '🍽 Кафе рядом раздают еду' : 'Что предлагают рядом'}
+      </Text>
+      <View style={styles.safetyBox}>
+        <Text style={styles.safetyText}>
+          🛡 Встречайтесь днём в людных местах. Помощь всегда бесплатна — не переводите деньги.
+        </Text>
+      </View>
+      {loading && <Text>Загрузка...</Text>}
+      {!loading && offers.filter((o) => !cafesOnly || o.is_partner).length === 0 && (
+        <Text style={styles.emptyText}>
+          {cafesOnly ? 'Сейчас кафе рядом ничего не раздают. Загляните позже!' : 'Пока никто ничего не предлагает'}
+        </Text>
+        )}
+ 
+        {offers.filter((o) => !cafesOnly || o.is_partner).map((o) => (
+          <View key={o.id} style={styles.requestCard}>
+            <Text style={styles.requestTitle}>
+              {o.category === 'food' ? '🍲' : '👕'} {o.title}
+            </Text>
+            {o.description ? (
+              <Text style={styles.requestDesc}>{o.description}</Text>
+            ) : null}
+            {renderPartnerBadge(o)}
+            {!o.is_partner && (
+              <Text onPress={() => openProfile(o.user_id)} style={{ textDecorationLine: 'underline' }}>
+                {o.user_name}
+              </Text>
+            )}
+ 
+            <TouchableOpacity
+              style={styles.helpButton}
+              onPress={() => respondToRequest(o.id)}
+              disabled={loading}>
+              <Text style={styles.helpButtonText}>Взять</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ marginTop: 6, alignItems: 'center' }}
+              onPress={() => confirmReport(o.id)}>
+              <Text style={{ color: '#999', fontSize: 12 }}>⚠️ Пожаловаться</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+ 
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => setStep('neederChoice')}>
+          <Text style={styles.backButtonText}>← Назад</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    )}
+ 
+    </View>
+  );
 }
+ 
+const styles = StyleSheet.create({
+  cafesButton: {
+    borderColor: '#F2C94C',
+    backgroundColor: '#FFFBEA',
+  },
+  partnerBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFF3CD',
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+  },
+  partnerBadgeText: {
+    color: '#8A6D00',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  partnerInfoBox: {
+    width: '100%',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 16,
+  },
+  partnerInfoTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    marginBottom: 8,
+  },
+  partnerInfoText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+  },
+  safetyBox: {
+    width: '100%',
+    backgroundColor: '#FFF8E1',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 14,
+  },
+  safetyText: {
+    fontSize: 13,
+    color: '#6D4C00',
+    lineHeight: 18,
+  },
+  googleButton: {
+    width: '100%',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  googleButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  appleButton: {
+    width: '100%',
+    height: 52,
+    marginBottom: 12,
+  },
+  orText: {
+    color: '#999',
+    fontSize: 14,
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  expiryHint: {
+    fontSize: 13,
+    color: '#888',
+    marginBottom: 10,
+    fontStyle: 'italic',
+  },
+ 
+  donateButton: {
+  marginTop: 24,
+  padding: 12,
+  alignItems: 'center',
+},
+   viewModeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  viewModeButtonActive: {
+    backgroundColor: '#2E7D32',
+  },
+  viewModeText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  viewModeTextActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  donateButtonText: {
+ 
+   color: '#B8860B',
+  fontWeight: '600',
+  fontSize: 15,
+},
+ 
+  mapButton: {
+    backgroundColor: '#eee',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  mapButtonText: {
+    color: '#333',
+    fontWeight: '600',
+  },
+ 
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    paddingTop: 60,
+    padding: 20,
+  },
+  title: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 30,
+  },
+  welcome: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  question: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
+  },
+  input: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 14,
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  button: {
+    width: '100%',
+    backgroundColor: '#2E7D32',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  backButton: {
+    marginTop: 16,
+    padding: 12,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: '#2E7D32',
+    fontSize: 15,
+  },
+  roleButton: {
+    width: '100%',
+    borderWidth: 2,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  roleButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  roleButtonSubtext: {
+    fontSize: 14,
+    color: '#888',
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 10,
+  },
+  categoryButton: {
+    flex: 1,
+    borderWidth: 2,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  categoryButtonSelected: {
+    borderColor: '#2E7D32',
+    backgroundColor: '#E8F5E9',
+  },
+  categoryButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  requestCard: {
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+    backgroundColor: '#fafafa',
+  },
+  requestTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  requestDesc: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 6,
+  },
+  requestMeta: {
+    fontSize: 12,
+    color: '#999',
+  },
+  emptyText: {
+    color: '#999',
+    fontStyle: 'italic',
+    marginBottom: 20,
+  },
+  helpButton: {
+    marginTop: 10,
+    backgroundColor: '#2E7D32',
+    borderRadius: 6,
+    padding: 10,
+    alignItems: 'center',
+  },
+  helpButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  logoutButton: {
+    marginTop: 24,
+    backgroundColor: '#999',
+    borderRadius: 6,
+    padding: 12,
+    alignItems: 'center',
+  },
+  logoutButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  deleteButton: {
+    marginTop: 10,
+    backgroundColor: '#D32F2F',
+    borderRadius: 6,
+    padding: 12,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+ 
+  respondedText: {
+    marginTop: 10,
+    color: '#2E7D32',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  linkButton: {
+    marginTop: 12,
+    padding: 10,
+    alignItems: 'center',
+  },
+  linkButtonText: {
+    color: '#2E7D32',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  responseItem: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: 6,
+    padding: 8,
+    marginTop: 6,
+  },
+  responseText: {
+    fontSize: 13,
+    color: '#2E7D32',
+    fontWeight: '600',
+  },
+  noResponseText: {
+    fontSize: 13,
+    color: '#999',
+    fontStyle: 'italic',
+    marginTop: 6,
+  },
+});
