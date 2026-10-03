@@ -12,20 +12,20 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "channel": "production"
     },
     "apk-users": {
       "distribution": "internal",
       "autoIncrement": true,
       "android": {
         "buildType": "apk"
-      }
+      },
+      "channel": "apk-users"
     },
     "apk-partners": {
       "extends": "apk-users",
-      "env": {
-        "EXPO_PUBLIC_DISTRIBUTION": "apk"
-      }
+      "channel": "apk-partners"
     }
   },
   "submit": {
