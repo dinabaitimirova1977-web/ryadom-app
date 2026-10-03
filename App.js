@@ -19,15 +19,16 @@ import * as WebBrowser from 'expo-web-browser';
 import * as ExpoLinking from 'expo-linking';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
 
 WebBrowser.maybeCompleteAuthSession();
  
 const API_URL = 'https://ryadom-backend-production.up.railway.app';
 
-// Кнопка «Стать партнёром», цена и оплата есть только в APK (в App Store и Google Play их нет).
-// В сборке APK задаётся EXPO_PUBLIC_DISTRIBUTION=apk; в Expo Go (Snack) видно для проверки.
+// Кнопка «Стать партнёром», цена и оплата есть только в APK для кафе (канал apk-partners).
+// В App Store, Google Play и APK для всех их нет. В Expo Go (Snack) видно для проверки.
 const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
-const IS_APK = process.env.EXPO_PUBLIC_DISTRIBUTION === 'apk' || IS_EXPO_GO;
+const IS_APK = Updates.channel === 'apk-partners' || IS_EXPO_GO;
 const KASPI_PAY_URL = 'https://pay.kaspi.kz/pay/y0lpmrri';
 const PARTNER_PRICE = '25 000 ₸';
  
