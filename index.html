@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Скачать «Рядом» — соседи помогают соседям</title>
+<meta name="description" content="Приложение взаимопомощи в Атырау: еда и одежда от соседей. Скачать для iPhone и Android.">
+<meta property="og:title" content="Рядом — соседи помогают соседям">
+<meta property="og:description" content="Еда и одежда от соседей в Атырау. Помощь всегда бесплатна.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --green:#2F7D32;   /* цвет иконки */
+    --green-dark:#1F5A23;
+    --sage:#EAF3E6;
+    --ink:#1C2A1E;
+    --muted:#55665A;
+    --sun:#F4C542;
+    --white:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;
+    color:var(--ink);background:var(--white);
+    font-size:18px;line-height:1.5;
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:0 22px}
+
+  /* Hero */
+  .hero{background:var(--green);color:var(--white);padding:44px 0 56px;position:relative;overflow:hidden}
+  .pin{width:72px;height:72px;margin-bottom:22px}
+  h1{
+    font-family:"Unbounded",sans-serif;font-weight:800;
+    font-size:clamp(34px,9vw,52px);line-height:1.05;letter-spacing:-.01em;
+  }
+  .lead{margin-top:16px;font-size:19px;max-width:30ch;opacity:.95}
+  .street{
+    position:absolute;right:-40px;bottom:-30px;width:220px;opacity:.14;pointer-events:none
+  }
+
+  /* Buttons */
+  .get{margin-top:-28px;position:relative}
+  .btn{
+    display:flex;align-items:center;gap:16px;
+    background:var(--white);color:var(--ink);text-decoration:none;
+    border:2px solid var(--ink);border-radius:18px;
+    padding:18px 20px;margin-bottom:14px;min-height:76px;
+  }
+  .btn svg{flex:none;width:34px;height:34px}
+  .btn b{display:block;font-size:20px}
+  .btn span{font-size:15px;color:var(--muted)}
+  .btn.main{background:var(--ink);color:var(--white)}
+  .btn.main span{color:#C9D6CC}
+  .btn:focus-visible{outline:4px solid var(--sun);outline-offset:3px}
+
+  /* Content */
+  section{padding:30px 0 6px}
+  h2{font-family:"Unbounded",sans-serif;font-weight:600;font-size:22px;line-height:1.25;margin-bottom:14px}
+  ol{list-style:none;counter-reset:s}
+  ol li{counter-increment:s;position:relative;padding:0 0 16px 50px;min-height:40px}
+  ol li::before{
+    content:counter(s);position:absolute;left:0;top:-2px;
+    width:36px;height:36px;border-radius:50%;
+    background:var(--sage);color:var(--green-dark);font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .note{background:var(--sage);border-radius:14px;padding:16px 18px;font-size:16px;color:var(--ink)}
+  .safe{border-left:6px solid var(--sun);background:#FFF8E1;border-radius:0 14px 14px 0;padding:16px 18px;margin-top:8px}
+  .safe p+p{margin-top:6px}
+  footer{padding:34px 0 40px;font-size:15px;color:var(--muted)}
+  footer a{color:var(--green-dark)}
+  @media (prefers-reduced-motion:no-preference){
+    .pin{animation:drop .6s cubic-bezier(.3,1.4,.5,1) both}
+    @keyframes drop{from{transform:translateY(-24px);opacity:0}to{transform:none;opacity:1}}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <!-- значок: метка на карте с сердцем -->
+    <svg class="pin" viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M32 2C19.3 2 9 12.1 9 24.7 9 41.6 32 62 32 62s23-20.4 23-37.3C55 12.1 44.7 2 32 2z" fill="#fff"/>
+      <path d="M32 36.5s-10-6.1-10-12.6c0-3.4 2.6-5.9 5.7-5.9 2 0 3.5 1 4.3 2.5.8-1.5 2.3-2.5 4.3-2.5 3.1 0 5.7 2.5 5.7 5.9 0 6.5-10 12.6-10 12.6z" fill="#2F7D32"/>
+    </svg>
+    <h1>Соседи помогают соседям</h1>
+    <p class="lead">Еда и одежда от людей рядом с вами в Атырау. Помощь всегда бесплатна.</p>
+    <svg class="street" viewBox="0 0 200 200" aria-hidden="true">
+      <g fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round">
+        <path d="M10 60h180M10 140h180M60 10v180M140 10v180"/>
+      </g>
+    </svg>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="get" id="buttons">
+    <a class="btn" id="android"
+       href="https://github.com/dinabaitimirova1977-web/ryadom-app/releases/latest/download/ryadom.apk">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.6 9.48l1.84-3.18a.38.38 0 00-.66-.38l-1.86 3.22a11.4 11.4 0 00-9.84 0L5.22 5.92a.38.38 0 00-.66.38L6.4 9.48A10.8 10.8 0 001 18h22a10.8 10.8 0 00-5.4-8.52zM7 15.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm10 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"/></svg>
+      <div><b>Скачать для Android</b><span>Файл APK для установки</span></div>
+    </a>
+    <a class="btn" id="iphone" href="https://apps.apple.com/app/ryadom/id6806599091">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.5-1-2.5-3.9zM14 5.5c.7-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.5 2.8-1.3z"/></svg>
+      <div><b>Скачать для iPhone</b><span>В App Store</span></div>
+    </a>
+  </div>
+
+  <section id="howto">
+    <h2>Как установить на Android</h2>
+    <ol>
+      <li>Нажмите «Скачать для Android» и дождитесь загрузки файла.</li>
+      <li>Откройте скачанный файл <b>ryadom.apk</b> — он будет в уведомлениях или в папке «Загрузки».</li>
+      <li>Если телефон спросит, разрешите установку из этого источника: «Настройки» → «Разрешить из этого источника».</li>
+      <li>Нажмите «Установить», затем «Открыть».</li>
+    </ol>
+    <p class="note">Телефон может предупредить, что приложение не из Google Play. Это нормально: «Рядом» скоро появится в Google Play, а пока его можно установить напрямую. Обновления приходят сами.</p>
+  </section>
+
+  <section>
+    <h2>Как это работает</h2>
+    <p>Если вам нужна еда или одежда — создайте запрос, и соседи поблизости откликнутся. Если можете помочь — смотрите запросы рядом на карте. Кафе-партнёры тоже делятся готовой едой.</p>
+  </section>
+
+  <section>
+    <div class="safe">
+      <p><b>Помощь всегда бесплатна.</b> Никогда не переводите деньги за помощь.</p>
+      <p>Встречайтесь в людных местах. Если что-то не так — нажмите «Пожаловаться».</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>Кафе и рестораны — <a href="partners.html">станьте партнёром «Рядом»</a></p>
+    <p>Вопросы и помощь: <a href="support.html">поддержка</a>, <a href="privacy-policy.md">политика конфиденциальности</a></p>
+    <p>© 2026 ИП Байтимирова, Атырау</p>
+  </footer>
+</main>
+
+<script>
+  // На iPhone первой показываем кнопку App Store, на Android — APK
+  var ua = navigator.userAgent || "";
+  var isIOS = /iPhone|iPad|iPod/i.test(ua);
+  var box = document.getElementById("buttons");
+  var a = document.getElementById("android"), i = document.getElementById("iphone");
+  if (isIOS) {
+    box.insertBefore(i, a);
+    i.classList.add("main");
+    document.getElementById("howto").style.display = "none";
+  } else {
+    a.classList.add("main");
+  }
+</script>
+</body>
+</html>
