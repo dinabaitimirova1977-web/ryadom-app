@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>«Рядом» для кафе и ресторанов</title>
+<meta name="description" content="Станьте партнёром «Рядом» в Атырау: делитесь едой с соседями и получайте новых гостей.">
+<meta property="og:title" content="«Рядом» для кафе и ресторанов">
+<meta property="og:description" content="Делитесь едой с соседями и получайте новых гостей.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --green:#2F7D32;--green-dark:#1F5A23;--sage:#EAF3E6;
+    --ink:#1C2A1E;--muted:#55665A;--sun:#F4C542;--white:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;color:var(--ink);background:var(--white);font-size:18px;line-height:1.5}
+  .wrap{max-width:560px;margin:0 auto;padding:0 22px}
+
+  .hero{background:var(--ink);color:var(--white);padding:44px 0 56px}
+  .badge{display:inline-flex;align-items:center;gap:8px;background:var(--sun);color:var(--ink);
+    font-weight:700;font-size:15px;border-radius:999px;padding:6px 14px 6px 8px;margin-bottom:22px}
+  .badge svg{width:22px;height:22px}
+  h1{font-family:"Unbounded",sans-serif;font-weight:800;font-size:clamp(30px,8vw,46px);line-height:1.08}
+  .lead{margin-top:16px;font-size:19px;max-width:32ch;color:#D7E2DA}
+
+  .price{margin-top:-28px;position:relative;background:var(--white);border:2px solid var(--ink);border-radius:18px;padding:20px 22px}
+  .price .big{font-family:"Unbounded",sans-serif;font-weight:800;font-size:28px;color:var(--green-dark)}
+  .price p{color:var(--muted);font-size:16px;margin-top:4px}
+
+  section{padding:30px 0 6px}
+  h2{font-family:"Unbounded",sans-serif;font-weight:600;font-size:22px;line-height:1.25;margin-bottom:14px}
+  ul.perks{list-style:none}
+  ul.perks li{padding:12px 0;border-bottom:1px solid #DDE6DF}
+  ul.perks li:last-child{border-bottom:0}
+  ul.perks b{display:block}
+  ul.perks span{color:var(--muted);font-size:16px}
+
+  ol{list-style:none;counter-reset:s}
+  ol li{counter-increment:s;position:relative;padding:0 0 16px 50px;min-height:40px}
+  ol li::before{content:counter(s);position:absolute;left:0;top:-2px;width:36px;height:36px;border-radius:50%;
+    background:var(--sage);color:var(--green-dark);font-weight:700;display:flex;align-items:center;justify-content:center}
+
+  .btn{display:flex;align-items:center;justify-content:center;gap:12px;text-decoration:none;
+    border-radius:18px;padding:18px 20px;min-height:68px;font-size:19px;font-weight:700;margin-bottom:14px;border:2px solid var(--ink)}
+  .btn.main{background:var(--green);border-color:var(--green);color:var(--white)}
+  .btn.alt{background:var(--white);color:var(--ink)}
+  .btn svg{width:28px;height:28px;flex:none}
+  .btn:focus-visible{outline:4px solid var(--sun);outline-offset:3px}
+  .note{background:var(--sage);border-radius:14px;padding:16px 18px;font-size:16px}
+  footer{padding:34px 0 40px;font-size:15px;color:var(--muted)}
+  footer a{color:var(--green-dark)}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="badge">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 2C19.3 2 9 12.1 9 24.7 9 41.6 32 62 32 62s23-20.4 23-37.3C55 12.1 44.7 2 32 2z" fill="#2F7D32"/><path d="M32 36.5s-10-6.1-10-12.6c0-3.4 2.6-5.9 5.7-5.9 2 0 3.5 1 4.3 2.5.8-1.5 2.3-2.5 4.3-2.5 3.1 0 5.7 2.5 5.7 5.9 0 6.5-10 12.6-10 12.6z" fill="#fff"/></svg>
+      Партнёр Рядом
+    </span>
+    <h1>Еда из вашего кафе не пропадёт</h1>
+    <p class="lead">Отдавайте непроданную еду соседям в Атырау через приложение «Рядом» — и о вас узнают новые гости.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="price">
+    <div class="big">Только для заведений</div>
+    <p>Мы проверяем каждую заявку по БИН/ИИН. Условия сотрудничества откроются в приложении после одобрения.</p>
+  </div>
+
+  <section>
+    <h2>Что получает кафе</h2>
+    <ul class="perks">
+      <li><b>Значок «Партнёр Рядом»</b><span>и страница вашего заведения в приложении</span></li>
+      <li><b>Ваши посты выше в ленте</b><span>люди рядом видят вашу еду первой</span></li>
+      <li><b>Раздел «Кафе рядом раздают еду»</b><span>отдельная кнопка, где видны только партнёры</span></li>
+      <li><b>Рассказ о вас в соцсетях</b><span>упоминания в Instagram и TikTok создателя «Рядом»</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Как подключиться</h2>
+    <ol>
+      <li>Скачайте приложение для кафе по кнопке ниже и установите его (Android).</li>
+      <li>Войдите через Google и нажмите «Для кафе и ресторанов».</li>
+      <li>Заполните заявку: название, адрес и БИН/ИИН заведения.</li>
+      <li>Мы проверим данные в течение дня — после одобрения в приложении откроются условия партнёрства.</li>
+    </ol>
+
+    <a class="btn main" href="https://github.com/dinabaitimirova1977-web/ryadom-app/releases/download/partners/ryadom-partners.apk">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.6 9.48l1.84-3.18a.38.38 0 00-.66-.38l-1.86 3.22a11.4 11.4 0 00-9.84 0L5.22 5.92a.38.38 0 00-.66.38L6.4 9.48A10.8 10.8 0 001 18h22a10.8 10.8 0 00-5.4-8.52zM7 15.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm10 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"/></svg>
+      Скачать приложение для кафе
+    </a>
+    <a class="btn alt" href="support.html">Задать вопрос в поддержку</a>
+
+    <p class="note">Телефон может предупредить, что приложение не из Google Play — это нормально. Откройте скачанный файл, разрешите установку из этого источника и нажмите «Установить».</p>
+  </section>
+
+  <footer>
+    <p>Обычным пользователям — <a href="./">скачать «Рядом» для iPhone и Android</a></p>
+    <p><a href="privacy-policy.md">Политика конфиденциальности</a></p>
+    <p>© 2026 ИП Байтимирова, Атырау</p>
+  </footer>
+</main>
+</body>
+</html>
